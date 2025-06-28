@@ -9,6 +9,9 @@ use std::mem;
 use std::path::Path;
 use thiserror::Error;
 
+/// CRC table for use in error detection calculations.
+const CRC_TABLE: [u32; 256] = generate_crc_table();
+
 /// The size of a CD-XA sector in bytes.
 const SECTOR_SIZE: usize = 2352;
 
@@ -207,7 +210,6 @@ pub struct Sector {
     data: [u8; 2048],
     edc: u32,
     ecc: [u32; 69],
-    crc_table: [u32; 256],
     gf8_log: [u8; 256],
     gf8_ilog: [u8; 256],
     gf8_product: [[u16; 256]; 43],
@@ -232,22 +234,9 @@ impl Sector {
         payload.copy_from_slice(&data[24..2072]);
 
         let edc = parse_le(&data[2072..2076])?;
-
-        let mut crc_table = [0u32; 256];
-        crc_table.iter_mut().enumerate().for_each(|(i, crc)| {
-            *crc = i.wrapping_shl(24) as u32;
-            for _ in 0..8 {
-                if *crc & 1 != 0 {
-                    *crc = (*crc).wrapping_shr(1) ^ 0xD8018001;
-                } else {
-                    *crc = (*crc).wrapping_shr(1);
-                }
-            }
-        });
-
         let len = parse_le(&data[2056..2060])? as usize;
 
-        /*let crc = calculate_edc(&data[16..], len, edc, &crc_table);
+        /*let crc = calculate_edc(&data[16..], len, edc);
         if crc != edc {
             return Err(CDXAError::EDCFail(edc, crc));
         }*/
@@ -292,7 +281,6 @@ impl Sector {
             data: mut_data[24..2072].try_into().unwrap(),
             edc: edc,
             ecc,
-            crc_table,
             gf8_log,
             gf8_ilog,
             gf8_product,
@@ -555,12 +543,12 @@ const fn adr(minute: u8, second: u8, frame: u8) -> u32 {
 }
 
 /// Calculates the error detection code (EDC) for the sector data.
-fn calculate_edc(input: &[u8], len: usize, crc: u32, crc_table: &[u32]) -> u32 {
+const fn calculate_edc(input: &[u8], len: usize, crc: u32) -> u32 {
     let mut crc = crc;
-    input[..len].iter().for_each(|&b| {
-        crc ^= b as u32;
-        crc = crc.wrapping_shr(8) ^ crc_table[(crc as usize) ^ (b as usize) & 255] as u32;
-    });
+    for i in 0..len {
+        crc ^= input[i] as u32;
+        crc = crc.wrapping_shr(8) ^ CRC_TABLE[(crc as usize) ^ (input[i] as usize) & 255] as u32;
+    }
 
     crc
 }
@@ -571,6 +559,28 @@ const fn decimal(x: u8) -> u8 {
         return x;
     }
     (x >> 4) * 10 + (x & 15)
+}
+
+/// Generates a CRC table for use in error detection calculations.
+const fn generate_crc_table() -> [u32; 256] {
+    let mut crc_table = [0u32; 256];
+    let mut i = 0;
+    
+    while i < 256 {
+        crc_table[i] = (i as u32).wrapping_shl(24);
+        let mut j = 0;
+        while j < 8 {
+            if crc_table[i] & 1 != 0 {
+                crc_table[i] = crc_table[i].wrapping_shr(1) ^ 0xD8018001;
+            } else {
+                crc_table[i] = crc_table[i].wrapping_shr(1);
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+    
+    crc_table
 }
 
 /// Shifts a Galois field element by a specified number of bits.
@@ -587,7 +597,7 @@ const fn gf8_shift(a: u8, shift: u8, log: &[u8], ilog: &[u8]) -> u8 {
 }
 
 /// Calculates the parity for a given data slice using Galois field multiplication.
-fn parity(
+const fn parity(
     data: &mut [u8],
     offset: usize,
     len: usize,
@@ -615,9 +625,9 @@ fn parity(
             }
         }
 
-        data[dst + 2 * len] = x as u8;
+        data[dst + (len << 1)] = x as u8;
         data[dst] = (x >> 8) as u8;
-        data[dst + 2 * len + 1] = y as u8;
+        data[dst + (len << 1) + 1] = y as u8;
         data[dst + 1] = (y >> 8) as u8;
 
         dst += 2;

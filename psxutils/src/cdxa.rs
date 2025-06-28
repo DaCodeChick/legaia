@@ -318,6 +318,7 @@ impl RecordTime {
     }
 }
 
+/// Represents the name of a file or directory in a CD-XA volume descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum FileName {
 	Name(String),
@@ -502,6 +503,36 @@ impl VolumeDescriptor {
 			cdxa_startup_directory,
 			application_use2,
 		}
+	}
+}
+
+/// Represents a path table entry in a CD-XA volume descriptor, which contains information about directories.
+#[derive(Debug, Clone)]
+struct PathTable {
+	directory_logical_block: u32,
+	extended_attr_length: u8,
+	parent_directory: u16,
+	directory_name: FileName,
+}
+
+impl PathTable {
+	/// Parses a path table entry from a byte slice.
+	fn parse(data: &[u8]) -> Result<Self, CDXAError> {
+		if data.len() < 8 {
+			return Err(CDXAError::ParseError(data));
+		}
+
+		let directory_logical_block = parse_le(&data[0..4])?;
+		let extended_attr_length = data[4];
+		let parent_directory = parse_le(&data[5..7])?;
+		let directory_name = FileName::from(&data[7..]);
+
+		Ok(Self {
+			directory_logical_block,
+			extended_attr_length,
+			parent_directory,
+			directory_name,
+		})
 	}
 }
 

@@ -1,0 +1,16 @@
+[package]
+name = "psxutils"
+version = "0.1.0"
+edition = "2024"
+description = "A collection of utilities for working with PlayStation 1 (PSX) files and formats."
+
+[dev-dependencies]
+clap = { version = "4.5.40", features = ["derive"] }
+
+[dependencies]
+bitflags = "2.9.1"
+bytemuck = "1.23.1"
+memmap2 = "0.9.5"
+num-traits = "0.2.19"
+rayon = "1.10.0"
+thiserror = "2.0.12"

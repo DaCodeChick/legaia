@@ -19,6 +19,8 @@ bevy = { workspace = true, features = [
     "bevy_sprite",        # 2D sprite rendering
     "bevy_text",          # Text rendering
     "bevy_ui",            # UI system
+    "bevy_gizmos",        # Debug gizmos
+    "bevy_state",         # State management
     "png",                # PNG texture loading
     "vorbis",             # OGG Vorbis audio
     "x11",                # X11 support (Linux)

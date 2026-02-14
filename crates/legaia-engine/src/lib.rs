@@ -17,7 +17,7 @@ pub mod input;
 pub mod menu;
 pub mod state;
 
-pub use state::GameState;
+pub use state::{GameState, StateManager};
 
 use bevy::prelude::*;
 
@@ -27,9 +27,13 @@ pub struct LegaiaEnginePlugin;
 impl Plugin for LegaiaEnginePlugin {
     fn build(&self, app: &mut App) {
         app
-            // TODO: Add game state management
-            // .insert_state(GameState::Loading)
-            // Add systems
+            // State management (based on decompilation)
+            .init_state::<GameState>()
+            .init_resource::<StateManager>()
+            // Add state management systems
+            .add_systems(Update, state::update_frame_counter)
+            .add_systems(Update, state::handle_state_transitions)
+            // Add core systems
             .add_systems(Startup, setup)
             // Battle system
             .add_plugins(battle::BattlePlugin)

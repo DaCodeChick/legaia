@@ -51,21 +51,20 @@ impl Plugin for LegaiaEnginePlugin {
 }
 
 fn setup(mut commands: Commands) {
-    // Camera setup
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 5.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
+    // Camera setup (Bevy 0.18+ uses required components instead of bundles)
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 5.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
 
-    // Lighting
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    // Lighting (Bevy 0.18+ uses required components)
+    commands.spawn((
+        DirectionalLight {
             illuminance: 10000.0,
             ..default()
         },
-        transform: Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, -0.5, 0.0)),
-        ..default()
-    });
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, -0.5, 0.0)),
+    ));
 
     tracing::info!("Engine initialized");
 }

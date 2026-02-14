@@ -8,13 +8,13 @@ members = [
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["Legend of Legaia Rewrite Contributors"]
 
 [workspace.dependencies]
 # Shared dependencies across the workspace
-bevy = { version = "0.14", default-features = false }
+bevy = { version = "0.18", default-features = false }
 thiserror = "2.0"
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }

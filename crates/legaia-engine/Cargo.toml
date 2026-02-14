@@ -2,6 +2,8 @@
 name = "legaia-engine"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+authors.workspace = true
 description = "Game engine for Legend of Legaia rewrite"
 
 [dependencies]

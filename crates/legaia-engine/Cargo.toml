@@ -1,0 +1,37 @@
+[package]
+name = "legaia-engine"
+version.workspace = true
+edition.workspace = true
+description = "Game engine for Legend of Legaia rewrite"
+
+[dependencies]
+# Bevy game engine with selected features
+bevy = { workspace = true, features = [
+    "bevy_asset",         # Asset loading
+    "bevy_audio",         # Audio playback
+    "bevy_gilrs",         # Gamepad support
+    "bevy_scene",         # Scene management
+    "bevy_winit",         # Window management
+    "bevy_core_pipeline", # Core rendering pipeline
+    "bevy_pbr",           # 3D rendering
+    "bevy_gltf",          # glTF model loading
+    "bevy_render",        # Rendering infrastructure
+    "bevy_sprite",        # 2D sprite rendering
+    "bevy_text",          # Text rendering
+    "bevy_ui",            # UI system
+    "png",                # PNG texture loading
+    "vorbis",             # OGG Vorbis audio
+    "x11",                # X11 support (Linux)
+    "wayland",            # Wayland support (Linux)
+] }
+
+# Asset loading
+legaia-assets = { path = "../legaia-assets" }
+
+# Utilities
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+
+# Logging
+tracing = { workspace = true }

@@ -1,0 +1,37 @@
+[package]
+name = "legaia-game"
+version.workspace = true
+edition.workspace = true
+description = "Legend of Legaia game executable"
+
+[dependencies]
+# Engine
+legaia-engine = { path = "../legaia-engine" }
+
+# Bevy with default features
+bevy = { workspace = true, features = [
+    "bevy_asset",
+    "bevy_audio",
+    "bevy_gilrs",
+    "bevy_scene",
+    "bevy_winit",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_gltf",
+    "bevy_render",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "png",
+    "vorbis",
+    "x11",
+    "wayland",
+] }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Configuration
+serde = { workspace = true }
+toml = { workspace = true }

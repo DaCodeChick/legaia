@@ -1,0 +1,30 @@
+[package]
+name = "legaia-assets"
+version.workspace = true
+edition.workspace = true
+description = "Asset extraction and management for Legend of Legaia"
+
+[[example]]
+name = "extract"
+path = "examples/extract.rs"
+
+[dependencies]
+# PSX format parsers
+psxutils = { path = "../psxutils" }
+
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+rayon = { workspace = true }
+memmap2 = { workspace = true }
+bytemuck = { workspace = true }
+
+# Image processing for texture conversion
+image = "0.25"
+
+# CLI for extraction tool
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

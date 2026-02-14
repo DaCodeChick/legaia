@@ -1,24 +1,21 @@
 //! Audio system
 //!
-//! Based on decompilation:
-//! - 24 sound channels (g_sound_channel_count at 0x801ce344)
-//! - Each channel is 27 bytes (0x1b)
-//! - 17 sound function handlers in function table
+//! PSX-style audio with 24 sound channels:
+//! - 24 simultaneous sound channels
+//! - Each channel is 27 bytes
+//! - 17 sound function handlers
 //! - Sound sequences with active flags
 //! - Reverb support via SPU
 
 use bevy::prelude::*;
 
-/// Maximum number of sound channels (from decompilation)
+/// Maximum number of sound channels
 pub const MAX_SOUND_CHANNELS: usize = 24;
 
-/// Size of each sound channel structure in bytes (from decompilation)
+/// Size of each sound channel structure in bytes
 pub const CHANNEL_SIZE_BYTES: usize = 0x1b; // 27 bytes
 
 /// Sound channel state
-///
-/// Structure based on decompilation of reset_sound_channels (0x80064bd0)
-/// Original structure is 27 bytes, stored in g_sound_channels array (0x801cdb52)
 #[derive(Debug, Clone, Copy)]
 pub struct SoundChannel {
     /// Channel priority (default: 0x18 = 24)
@@ -41,9 +38,9 @@ pub struct SoundChannel {
 impl Default for SoundChannel {
     fn default() -> Self {
         Self {
-            priority: 0x18, // Default priority from reset_sound_channels
+            priority: 0x18, // Default priority 24
             status: 0,
-            volume: 0xff, // Default max volume
+            volume: 0xff, // Max volume
             pan: 0,
             _reserved: [0; 23],
         }
@@ -51,13 +48,6 @@ impl Default for SoundChannel {
 }
 
 /// Audio system state
-///
-/// Based on decompilation:
-/// - g_sound_channels (0x801cdb52)
-/// - g_current_sound_channel (0x801ce362)
-/// - g_sound_sequence_active (0x8007bb20)
-/// - g_sound_seq_status (0x8007b708)
-/// - g_sound_system_initialized (0x8007bb30)
 #[derive(Resource, Debug)]
 pub struct AudioSystem {
     /// Array of 24 sound channels

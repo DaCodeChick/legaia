@@ -5,7 +5,7 @@
 //! - Texture management
 //! - Animation playback
 //! - Camera control
-//! - Debug text rendering (based on decompilation)
+//! - Debug text rendering
 
 pub mod debug;
 

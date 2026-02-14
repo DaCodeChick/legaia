@@ -1,17 +1,17 @@
 //! Debug text rendering system
 //!
-//! Based on decompilation of debug_printf (0x8001a068):
-//! - On-screen debug text rendering character-by-character
-//! - Cursor position tracking (g_debug_cursor_x, g_debug_cursor_y)
+//! PSX-style on-screen debug text rendering:
+//! - Character-by-character rendering
+//! - Cursor position tracking
 //! - 8-color palette support
 //! - Format specifiers: %d, %x, %s, %c, %0Nd, %1-9d
-//! - Newline handling: X resets to 0x10, Y advances by 8
+//! - Newline handling with automatic cursor reset
 
 use bevy::gizmos::prelude::*;
 use bevy::input::ButtonInput;
 use bevy::prelude::{Color, ColorToPacked, Component, KeyCode, Res, ResMut, Resource, Vec2};
 
-/// Default debug text color (gray from decompilation)
+/// Default debug text color (gray)
 pub const DEFAULT_TEXT_COLOR: u32 = 0x808080;
 
 /// Newline X position reset value
@@ -24,8 +24,6 @@ pub const LINE_HEIGHT: i32 = 8;
 pub const CHAR_WIDTH: i32 = 8;
 
 /// Debug color palette (8 colors, indexed by %c format specifier)
-///
-/// Based on g_debug_color_table (0x800704cc)
 pub const DEBUG_COLOR_PALETTE: [Color; 8] = [
     Color::srgb(1.0, 1.0, 1.0), // 0: White
     Color::srgb(1.0, 0.0, 0.0), // 1: Red
@@ -38,11 +36,6 @@ pub const DEBUG_COLOR_PALETTE: [Color; 8] = [
 ];
 
 /// Debug text renderer state
-///
-/// Mirrors the original game's debug printf system:
-/// - g_debug_cursor_x (0x8007b97c)
-/// - g_debug_cursor_y (0x8007b980)
-/// - g_debug_text_color (0x8007b978)
 #[derive(Resource, Debug)]
 pub struct DebugRenderer {
     /// Current cursor X position
@@ -86,8 +79,6 @@ impl DebugRenderer {
     }
 
     /// Handle newline - reset X, advance Y
-    ///
-    /// Based on decompilation: X=0x10, Y+=8
     pub fn newline(&mut self) {
         self.cursor_x = NEWLINE_X_RESET;
         self.cursor_y += LINE_HEIGHT;
@@ -99,8 +90,6 @@ impl DebugRenderer {
     }
 
     /// Set color by palette index (0-7)
-    ///
-    /// Based on %c format specifier in debug_printf
     pub fn set_color_by_index(&mut self, index: u8) {
         if (index as usize) < self.color_palette.len() {
             let color = self.color_palette[index as usize];

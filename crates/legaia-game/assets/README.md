@@ -47,7 +47,7 @@ Assets must be manually extracted from your retail disc using third-party tools:
 
 ### Future: Automated Extraction
 
-Once asset locations are identified through decompilation, we can build an automated extraction tool using `legaia-assets` crate. This will allow:
+Once asset locations are identified, we can build an automated extraction tool using `legaia-assets` crate. This will allow:
 
 ```bash
 cargo run --example extract -- --input /path/to/disc.bin --output ./assets

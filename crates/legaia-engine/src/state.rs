@@ -1,17 +1,15 @@
 //! Game state management
 //!
-//! Based on decompilation of main() (0x80015e90):
-//! - Original uses integer-indexed state machine with function pointer table
+//! Integer-indexed state machine with function handler table:
 //! - 6 function handlers per state (likely: init, update, draw, cleanup, + 2 unknown)
 //! - State transitions reset 4 counters
-//! - Negative state value triggers exit to PSX.EXE
+//! - Negative state value triggers exit
 
 use bevy::prelude::{ResMut, Resource};
 use bevy::state::state::{NextState, States};
 
 /// Main game states
 ///
-/// Corresponds to indices in the original g_state_handler_table (0x8007079c).
 /// Each state has 6 function pointers in the original game.
 #[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
 pub enum GameState {
@@ -33,12 +31,6 @@ pub enum GameState {
 }
 
 /// State machine manager
-///
-/// Mirrors the original game's state management system:
-/// - g_current_game_state (0x8007b83c)
-/// - g_previous_game_state (0x8007b7ac)
-/// - g_state_backup (0x8007b87c)
-/// - g_state_counter_1 through g_state_counter_4
 #[derive(Resource, Debug)]
 pub struct StateManager {
     /// Current active state

@@ -1,8 +1,7 @@
 //! CD-ROM ISO 9660 / CD-XA parser and streaming system
 //!
 //! This module provides functionality to read PlayStation disc images
-//! in ISO 9660 format with CD-XA extensions, plus CD-ROM streaming
-//! types based on decompilation.
+//! in ISO 9660 format with CD-XA extensions, plus CD-ROM streaming types.
 //!
 //! ## Example
 //!

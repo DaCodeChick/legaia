@@ -27,7 +27,7 @@ pub struct LegaiaEnginePlugin;
 impl Plugin for LegaiaEnginePlugin {
     fn build(&self, app: &mut App) {
         app
-            // State management (based on decompilation)
+            // State management
             .init_state::<GameState>()
             .init_resource::<StateManager>()
             // Add state management systems

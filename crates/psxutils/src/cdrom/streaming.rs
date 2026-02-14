@@ -1,20 +1,8 @@
 //! CD-ROM streaming system types
 //!
-//! Based on decompilation of CD-ROM functions:
-//! - prepare_cdrom_data_load (0x8003ebe4)
-//! - wait_for_cdrom_read (0x8003de7c)
-//! - prepare_cdrom_stream (0x8003e800)
-//! - start_cdrom_async_read (0x8003f128)
-//! - poll_cdrom_sync_status (0x8003f2b8)
+//! Types and constants for CD-ROM streaming operations used in PSX games.
 
 /// CD-ROM system state
-///
-/// Based on decompilation globals:
-/// - g_cdrom_cached_state (0x8007bc3c)
-/// - g_cdrom_load_flag (0x8007bc4c)
-/// - g_cdrom_active_flag (0x8007ba70)
-/// - g_cdrom_busy_flag (0x8007bc40)
-/// - g_cdrom_status_code (0x8007bc98)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CdromState {
     /// CD-ROM is idle
@@ -30,8 +18,6 @@ pub enum CdromState {
 }
 
 /// CD-ROM async mode flags
-///
-/// Based on g_cdrom_async_mode (0x8007bca0)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CdromAsyncMode {
     /// Synchronous/blocking mode
@@ -41,8 +27,6 @@ pub enum CdromAsyncMode {
 }
 
 /// CD-ROM streaming parameters
-///
-/// Based on prepare_cdrom_stream (0x8003e800)
 #[derive(Debug, Clone, Copy)]
 pub struct CdromStreamParams {
     /// Sector count to read
@@ -84,8 +68,7 @@ impl CdromStreamParams {
 
 /// CD-ROM sector position
 ///
-/// Represents a position on the CD in minutes:seconds:sectors format
-/// Based on CdlLOC structure used in g_cdrom_current_position (0x8007bc5c)
+/// Represents a position on the CD in minutes:seconds:sectors format (MSF)
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CdromPosition {
     /// Minutes (0-99)
@@ -107,8 +90,6 @@ impl CdromPosition {
     }
 
     /// Convert position to absolute sector number
-    ///
-    /// Based on CdPosToInt function used in start_cdrom_async_read
     pub fn to_sector_number(&self) -> u32 {
         let minutes = self.minute as u32;
         let seconds = self.second as u32;
@@ -134,9 +115,9 @@ impl CdromPosition {
 
 /// CD-ROM operation timeouts
 ///
-/// Based on decompilation findings:
-/// - g_cdrom_wait_counter: 0x78 = 120 frames (~2 seconds at 60fps)
-/// - g_cdrom_timeout_counter: 0xb4 = 180 frames (~3 seconds)
+/// Standard timeout values for CD-ROM operations:
+/// - Wait counter: 120 frames (~2 seconds at 60fps)
+/// - Timeout counter: 180 frames (~3 seconds)
 pub mod timeouts {
     /// Wait counter timeout (120 frames = ~2 seconds at 60fps)
     pub const WAIT_COUNTER: u32 = 0x78;
@@ -146,8 +127,6 @@ pub mod timeouts {
 }
 
 /// CD-ROM sync status codes
-///
-/// Based on poll_cdrom_sync_status (0x8003f2b8) and start_cdrom_async_read
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum CdromSyncStatus {

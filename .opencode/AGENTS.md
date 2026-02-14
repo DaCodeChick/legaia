@@ -427,43 +427,66 @@ Total: ~100 functions | Status: Partially Named
 | ... | ... | ... | ... | ... |
 
 #### Main Game Code (0x80010000-0x8007B7FF)
-Total: 1,121 functions | Status: Beginning Analysis
+Total: 1,121 functions | Status: 5 Complete, 1,116 Remaining
 
 | Address    | Function Name | Status | System | Notes |
 |------------|---------------|--------|--------|-------|
-| 0x80015e90 | main | **In Progress** | Entry | Entry point - globals renamed, functions/locals still unnamed ❌ |
-| 0x80026c20 | __main | Identified | Entry | Empty function (returns immediately) |
+| 0x80015e90 | main | **✅ Complete** | Entry | Entry point - ALL symbols renamed, ZERO unnamed locals/params/functions ✅ |
+| 0x80026c20 | __main | **✅ Complete** | Entry | Empty function (returns immediately) |
+| 0x8003f084 | get_config_mode | **✅ Complete** | Config | Returns config mode (1 = retail). No params/locals/calls. Commented. |
+| 0x8002b92c | get_system_mode | **✅ Complete** | Config | Returns system mode (0 = no vibration). No params/locals/calls. Commented. |
+| 0x8003ee7c | init_serial_audio | **✅ Complete** | Audio | Initializes CD audio. All params/locals renamed. Commented. |
+| 0x8003e104 | load_monster_audio_data | **✅ Complete** | Audio | Loads monster audio from CD or host. ALL symbols renamed. Fully documented. |
+| 0x80060910 | PCclose | **✅ Complete** | Library | PSX library function to close file opened with PCopen |
 | ... | ... | Unanalyzed | ... | ... |
+
+**Recently Completed (2026-02-14 DICK Session):**
+- ✅ main() - Verified all symbols renamed
+- ✅ get_config_mode() - Simple constant return
+- ✅ get_system_mode() - Simple constant return  
+- ✅ init_serial_audio() - CD audio initialization
+- ✅ load_monster_audio_data() - Complex function, 10 locals + 5 globals + 1 called function renamed
+- ✅ PCclose() - PSX library function identified
+
+**Globals Renamed (2026-02-14):**
+- g_monster_count (0x801c8984)
+- g_monster_audio_base_sector (0x801c7eec)
+- g_monster_audio_offset_table (0x801c8980)
+- g_cdrom_error_counter (0x8007b86e)
+- g_loaded_audio_size (0x8007bc38)
 
 #### Current Work Queue (DICK Methodology)
 
-Functions that MUST be analyzed next (called from main):
-- [ ] `FUN_8003ee7c` - Called early in main, likely core init
-- [ ] `FUN_8003f084` - Returns config/mode value
-- [ ] `FUN_8002b92c` - Returns system mode flag  
-- [ ] `FUN_8003f024` - Early initialization
-- [ ] `FUN_80062310` - Early initialization
-- [ ] `FUN_800644c0` - Takes 3 params: address, 4, 4 - memory allocation?
-- [ ] `FUN_8002b934` - Conditional system init
-- [ ] `FUN_8001d230` - Memory system init
-- [ ] `FUN_8002b3d4` - Data loading/copying (3 params)
-- [ ] `FUN_800265e8` - Init work
-- [ ] `FUN_8001d424` - Init work
-- [ ] `FUN_8003f08c` - Takes system mode parameter
-- [ ] `FUN_8003e6bc` - Loads file "h:\\prot\\cdname.dat"
-- [ ] `FUN_8001daf8` - Takes 0x400 parameter
-- [ ] `FUN_8001dcf8` - Init work (4 params)
-- [ ] `FUN_8001e3b8` - Init work (4 params)
-- [ ] `FUN_8001698c` - Init work
-- [ ] `FUN_80016b6c` - Init work (4 params)
-- [ ] `FUN_8001822c` - State transition cleanup
-- [ ] `FUN_8003ebe4` - Init work (4 params)
-- [ ] `FUN_8003de7c` - State transition function (4 params)
-- [ ] `FUN_8002666c` - Just before main loop (3 params)
-- [ ] `FUN_8003d254` - **Pre-frame update** - CALLED EVERY FRAME
-- [ ] `FUN_8003ed04` - State transition cleanup (4 params)
-- [ ] `FUN_80016230` - State transition cleanup
-- [ ] `FUN_80017714` - Exit to executable (4 params)
+Functions called from main() that need analysis (in call order):
+- [x] `init_serial_audio` (0x8003ee7c) - Already renamed ✅
+- [x] `get_config_mode` (0x8003f084) - Already renamed ✅
+- [x] `get_system_mode` (0x8002b92c) - Already renamed ✅
+- [x] `init_cdrom_system` (0x8003f024) - Already renamed ✅
+- [x] `init_sound_system` (0x80062310) - Already renamed ✅
+- [x] `init_sprite_buffer` (0x800644c0) - Already renamed ✅
+- [x] `vibration_stub` (0x8002b934) - Already renamed ✅
+- [x] `init_memory_card_system` (0x8001d230) - Already renamed ✅
+- [x] `init_memory_allocator` (0x8002b3d4) - Already renamed ✅
+- [x] `init_data_tables` (0x800265e8) - Already renamed ✅
+- [x] `init_game_state` (0x8001d424) - Already renamed ✅
+- [x] `init_cdrom_protection` (0x8003f08c) - Already renamed ✅
+- [x] `load_file_from_host` (0x8003e6bc) - Already renamed ✅
+- [x] `init_display_buffers` (0x8001daf8) - Already renamed ✅
+- [x] `init_state_environment` (0x8001dcf8) - Already renamed ✅
+- [x] `allocate_graphics_buffers` (0x8001e3b8) - Already renamed ✅
+- [x] `prepare_frame_render` (0x8001698c) - Already renamed ✅
+- [x] `render_and_display_frame` (0x80016b6c) - Already renamed ✅
+- [x] `prepare_cdrom_data_load` (0x8001822c) - Already renamed ✅
+- [x] `wait_for_cdrom_read` (0x8003ebe4) - Already renamed ✅
+- [x] `init_sound_playback_system` (0x8003de7c) - Already renamed ✅
+- [x] `gte_load_h_register` (0x8002666c) - Already renamed ✅
+- [ ] State handler functions (from g_state_handler_table) - **Need to analyze next**
+- [x] `abort_cdrom_operations` (0x8003ed04) - Already renamed ✅
+- [x] `cleanup_and_transition_state` (0x80016230) - Already renamed ✅
+- [x] `update_controller_input` (0x8003d254) - Already renamed ✅
+- [x] `exit_to_executable` (0x80017714) - Already renamed ✅
+
+**Next Priority**: Analyze state handler functions and ensure each has all symbols renamed
 
 ---
 

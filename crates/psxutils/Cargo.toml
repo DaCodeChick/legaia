@@ -19,6 +19,23 @@ memmap2 = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
+# Image processing (optional, feature-gated)
+image = { version = "0.25", optional = true }
+
+# Progress bars (optional, for CLI tools)
+indicatif = { version = "0.17", optional = true }
+
+# Parallel processing (optional, for batch operations)
+rayon = { version = "1.8", optional = true }
+
+# JSON serialization (optional, for metadata export)
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[features]
+# Feature for asset extraction tools
+extraction = ["image", "indicatif", "rayon", "serde", "serde_json"]
+
 [dev-dependencies]
 # Testing utilities
 anyhow = { workspace = true }

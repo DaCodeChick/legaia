@@ -14,6 +14,7 @@ const VAG_MAGIC: u32 = 0x70474156; // "VAGp" in little-endian
 
 /// Discovered asset in a container file
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DiscoveredAsset {
     /// Offset in the container file where asset starts
     pub offset: usize,
@@ -25,6 +26,7 @@ pub struct DiscoveredAsset {
 
 /// Type of discovered asset
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AssetType {
     /// TIM texture with dimensions
     Tim { width: u16, height: u16 },

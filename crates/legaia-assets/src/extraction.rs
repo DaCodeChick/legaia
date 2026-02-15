@@ -85,52 +85,51 @@ impl AssetExtractionService {
             )
         })?;
 
-        // Read directory entries
+        // Collect all files recursively
         self.report_progress(ExtractionProgress {
             current_file: String::new(),
             total_files: 0,
             processed_files: 0,
             converted_files: 0,
-            step: "Reading directory...".to_string(),
+            step: "Scanning directories...".to_string(),
         });
 
-        let entries = cdrom.read_dir("/")?;
-
-        // Filter to only files (not directories)
-        let files: Vec<_> = entries.iter().filter(|e| !e.is_dir).collect();
-
-        let total_files = files.len();
+        let all_files = self.collect_files_recursive(&cdrom, "/", &self.output_dir)?;
+        let total_files = all_files.len();
         let processed = AtomicUsize::new(0);
         let converted = AtomicUsize::new(0);
 
         // Extract each file
-        for entry in &files {
+        for (disc_path, output_path) in &all_files {
             let current = processed.fetch_add(1, Ordering::SeqCst);
 
             self.report_progress(ExtractionProgress {
-                current_file: entry.name.clone(),
+                current_file: disc_path.clone(),
                 total_files,
                 processed_files: current,
                 converted_files: converted.load(Ordering::SeqCst),
-                step: format!("Extracting {}", entry.name),
+                step: format!("Extracting {}", disc_path),
             });
 
             // Read file data
-            match cdrom.read_file(&entry.name) {
+            match cdrom.read_file(disc_path) {
                 Ok(data) => {
-                    let output_path = self.output_dir.join(&entry.name);
+                    // Create parent directory if needed
+                    if let Some(parent) = output_path.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
 
                     // Try to convert based on extension
-                    let was_converted = if entry.name.ends_with(".TIM") {
+                    let was_converted = if disc_path.ends_with(".TIM") {
                         self.convert_tim(&data, &output_path.with_extension("png"))
-                    } else if entry.name.ends_with(".VAG") {
+                    } else if disc_path.ends_with(".VAG") {
                         self.convert_vag(&data, &output_path.with_extension("wav"))
-                    } else if entry.name.ends_with(".TMD") {
+                    } else if disc_path.ends_with(".TMD") {
                         self.convert_tmd(&data, &output_path.with_extension("gltf"))
                     } else {
                         // Unknown format, just save raw data
-                        if let Err(e) = fs::write(&output_path, &data) {
-                            tracing::warn!("Failed to write {}: {}", entry.name, e);
+                        if let Err(e) = fs::write(output_path, &data) {
+                            tracing::warn!("Failed to write {}: {}", disc_path, e);
                             false
                         } else {
                             true
@@ -142,7 +141,7 @@ impl AssetExtractionService {
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to read {}: {}", entry.name, e);
+                    tracing::warn!("Failed to read {}: {}", disc_path, e);
                 }
             }
         }
@@ -163,6 +162,38 @@ impl AssetExtractionService {
             extracted_files: final_processed,
             converted_files: final_converted,
         })
+    }
+
+    /// Recursively collect all files from disc
+    fn collect_files_recursive(
+        &self,
+        cdrom: &CdRom,
+        dir_path: &str,
+        output_base: &Path,
+    ) -> Result<Vec<(String, PathBuf)>> {
+        let mut files = Vec::new();
+        let entries = cdrom.read_dir(dir_path)?;
+
+        for entry in entries {
+            let full_path = if dir_path == "/" {
+                format!("/{}", entry.name)
+            } else {
+                format!("{}/{}", dir_path, entry.name)
+            };
+
+            let output_path = output_base.join(&entry.name);
+
+            if entry.is_dir {
+                // Recursively scan subdirectory
+                let subdir_files = self.collect_files_recursive(cdrom, &full_path, &output_path)?;
+                files.extend(subdir_files);
+            } else {
+                // Add file to list
+                files.push((full_path, output_path));
+            }
+        }
+
+        Ok(files)
     }
 
     /// Convert TIM texture to PNG

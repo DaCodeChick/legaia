@@ -148,23 +148,75 @@ impl CdRom {
         }
     }
 
-    /// Read the root directory
+    /// Read a directory at the given path
     ///
-    /// Reads and parses ISO 9660 directory entries
+    /// Reads and parses ISO 9660 directory entries. Supports subdirectories.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use psxutils::cdrom::CdRom;
+    /// # let disc = CdRom::open("game.bin")?;
+    /// let root = disc.read_dir("/")?;
+    /// let subdir = disc.read_dir("/MOV")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn read_dir(&self, path: &str) -> Result<Vec<DirectoryEntry>> {
-        // For now, only support root directory
-        if path != "/" {
-            return Err(PsxError::FileNotFound(format!(
-                "Only root directory '/' is currently supported, got '{}'",
-                path
-            )));
+        // Normalize path
+        let normalized = if path.is_empty() || path == "/" {
+            "/"
+        } else {
+            path.trim_start_matches('/').trim_end_matches('/')
+        };
+
+        // Find the directory entry
+        let (dir_lba, dir_size) = if normalized == "/" {
+            (self.root_dir_lba, self.root_dir_size)
+        } else {
+            // Walk the path to find the directory
+            self.find_directory(normalized)?
+        };
+
+        // Parse directory entries
+        self.parse_directory_entries(dir_lba, dir_size)
+    }
+
+    /// Find a directory by path and return its LBA and size
+    fn find_directory(&self, path: &str) -> Result<(u32, u32)> {
+        let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+        let mut current_lba = self.root_dir_lba;
+        let mut current_size = self.root_dir_size;
+
+        for part in parts {
+            // Parse the current directory
+            let entries = self.parse_directory_entries(current_lba, current_size)?;
+
+            // Find the subdirectory
+            let entry = entries
+                .iter()
+                .find(|e| e.is_dir && e.name.eq_ignore_ascii_case(part))
+                .ok_or_else(|| {
+                    PsxError::FileNotFound(format!(
+                        "Directory '{}' not found in path '{}'",
+                        part, path
+                    ))
+                })?;
+
+            current_lba = entry.lba;
+            current_size = entry.size;
         }
 
+        Ok((current_lba, current_size))
+    }
+
+    /// Parse directory entries from a directory's LBA and size
+    fn parse_directory_entries(&self, dir_lba: u32, dir_size: u32) -> Result<Vec<DirectoryEntry>> {
         let mut entries = Vec::new();
         let mut offset = 0;
 
         // Read directory data
-        let dir_data = self.read_data(self.root_dir_lba, self.root_dir_size)?;
+        let dir_data = self.read_data(dir_lba, dir_size)?;
 
         while offset < dir_data.len() {
             // First byte is the record length
@@ -260,34 +312,47 @@ impl CdRom {
 
     /// Read a file by path
     ///
-    /// Reads a file from the ISO 9660 filesystem
+    /// Reads a file from the ISO 9660 filesystem. Supports subdirectories.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use psxutils::cdrom::CdRom;
+    /// # let disc = CdRom::open("game.bin")?;
+    /// let file1 = disc.read_file("/SYSTEM.CNF")?;
+    /// let file2 = disc.read_file("/MOV/INTRO.STR")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn read_file(&self, path: &str) -> Result<Vec<u8>> {
-        // Parse the path - for now only support root-level files
-        let filename = if let Some(stripped) = path.strip_prefix('/') {
-            stripped
+        // Normalize path
+        let normalized = path.trim_start_matches('/');
+
+        // Split into directory and filename
+        let (dir_path, filename) = if let Some(idx) = normalized.rfind('/') {
+            let dir = &normalized[..idx];
+            let file = &normalized[idx + 1..];
+            (dir, file)
         } else {
-            path
+            ("", normalized)
         };
 
-        if filename.contains('/') {
-            return Err(PsxError::FileNotFound(
-                "Subdirectories not yet supported".to_string(),
-            ));
-        }
+        // Read the directory containing the file
+        let dir = if dir_path.is_empty() { "/" } else { dir_path };
 
-        // Read root directory
-        let entries = self.read_dir("/")?;
+        let entries = self.read_dir(dir)?;
 
         // Find the file
         let entry = entries
             .iter()
             .find(|e| e.name.eq_ignore_ascii_case(filename))
-            .ok_or_else(|| PsxError::FileNotFound(format!("File '{}' not found", filename)))?;
+            .ok_or_else(|| {
+                PsxError::FileNotFound(format!("File '{}' not found in '{}'", filename, dir))
+            })?;
 
         if entry.is_dir {
             return Err(PsxError::ParseError(format!(
                 "'{}' is a directory, not a file",
-                filename
+                path
             )));
         }
 

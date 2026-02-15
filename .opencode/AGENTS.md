@@ -315,16 +315,32 @@ pub struct GpuConfig {
 
 ### Enforcement
 
+**IMPORTANT: This policy is actively enforced. All Rust code MUST be clean of decompilation references.**
+
 Before committing Rust code:
-1. Search for PSX addresses (regex: `0x[0-9a-f]{8}`)
-2. Search for "decompil", "analysis", "original", "discovered"
-3. Search for "FUN_", "DAT_", "g_[a-z_]+_[a-z_]+ @"
-4. Check that all docs describe WHAT/WHY, not WHERE-FROM
+1. Search for PSX addresses (regex: `0x8[0-9a-f]{7}` - RAM addresses starting with 0x80)
+2. Search for "Ghidra", "decompil", "analysis", "reverse engineering", "discovered"
+3. Search for "FUN_", "DAT_", "PTR_", "UNK_" (Ghidra auto-generated names)
+4. Search for function names from executable (e.g., "load_cdrom_file", "init_game_state")
+5. Search for phrases like "based on analysis", "found at address", "original code"
+6. Check that all docs describe WHAT/WHY, not WHERE-FROM or HOW-DISCOVERED
+
+**Examples of PSX addresses to remove:**
+- ❌ `0x8003e4e8` - Code addresses
+- ❌ `0x801c70f0` - Data/global addresses  
+- ❌ `0x1f800000` - Hardware register addresses
+- ✅ `0x00000010` - OK: File format magic numbers/constants
 
 If you accidentally add decompilation references to Rust code:
-1. Immediately revert or amend the commit
-2. Rewrite the code with clean descriptions
-3. Update this file if the policy needs clarification
+1. Immediately fix it before committing
+2. Rewrite with clean, professional descriptions
+3. Move technical discovery details to `.opencode/AGENTS.md` or `docs/`
+4. Use `git commit --amend` if already committed but not pushed
+
+**Recent cleanup (2026-02-15):**
+- ✅ Removed Ghidra references from `crates/psxutils/src/formats/dat.rs`
+- ✅ Removed PSX memory addresses (`0x8003e4e8`, `0x801c70f0`)
+- ✅ Removed phrases like "Verified via Ghidra analysis of SCUS_942.54"
 
 **If ANY of the above checks fail, the function is NOT complete.**
 

@@ -2,7 +2,7 @@
 //!
 //! PROT.DAT and DMY.DAT are archive files containing game assets.
 //!
-//! ## Format (Verified via Ghidra analysis of SCUS_942.54)
+//! ## Format Structure
 //!
 //! ```text
 //! [File Table]
@@ -12,19 +12,17 @@
 //! Entry N: [start_sector: u32, end_sector: u32]
 //!
 //! [File Data]
-//! File data starts after table (typically sector 3, offset 0x1800)
+//! File data starts after table (typically sector 3)
 //! ```
+//!
+//! ## Format Details
 //!
 //! - Sector size: 2048 bytes (CD-ROM sector size)
 //! - Format: [start_sector, end_sector] NOT [offset, count]
 //! - File size: (end_sector - start_sector) * 2048 bytes
 //! - Byte offset: start_sector * 2048
-//!
-//! ## Sources
-//! - Ghidra analysis of `load_cdrom_file` function at 0x8003e4e8
-//! - Global sector table `g_sector_table` at 0x801c70f0
-//! - PROT.DAT: 619 entries, 116 MB
-//! - DMY.DAT: 9 entries, 36 MB
+//! - PROT.DAT: 619 entries, ~116 MB
+//! - DMY.DAT: 9 entries, ~36 MB
 //!
 //! ## Example
 //!

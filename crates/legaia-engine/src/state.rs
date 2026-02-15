@@ -44,7 +44,7 @@ pub struct StateManager {
     pub counter_2: u32,
     pub counter_3: u32,
     pub counter_4: u32,
-    /// Frame counter (g_frame_counter at 0x8007b6f4)
+    /// Frame counter
     pub frame_counter: u32,
 }
 

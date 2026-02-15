@@ -29,7 +29,7 @@ pub struct LegaiaEnginePlugin;
 impl Plugin for LegaiaEnginePlugin {
     fn build(&self, app: &mut App) {
         app
-            // Core state resources (from decompilation analysis)
+            // Core state resources
             .add_plugins(CoreStatePlugin)
             // State management
             .init_state::<GameState>()

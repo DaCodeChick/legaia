@@ -89,8 +89,6 @@ impl AudioSystem {
     }
 
     /// Reset all channels to default state
-    ///
-    /// Based on reset_sound_channels (0x80064bd0)
     pub fn reset_channels(&mut self) {
         for channel in &mut self.channels {
             *channel = SoundChannel::default();
@@ -99,8 +97,6 @@ impl AudioSystem {
     }
 
     /// Enable SPU reverb effect
-    ///
-    /// Based on spu_enable_reverb (0x800655ac)
     pub fn enable_reverb(&mut self) {
         self.reverb_enabled = true;
         tracing::info!("SPU reverb enabled");
@@ -123,8 +119,6 @@ impl AudioSystem {
     }
 
     /// Cleanup sound sequence (variant 1)
-    ///
-    /// Based on cleanup_sound_sequence_1 (0x800266e0)
     pub fn cleanup_sequence_1(&mut self) {
         self.sequence_active = false;
         self.sequence_status = 0;
@@ -132,8 +126,6 @@ impl AudioSystem {
     }
 
     /// Cleanup sound sequence (variant 2)
-    ///
-    /// Based on cleanup_sound_sequence_2 (0x80026520)
     pub fn cleanup_sequence_2(&mut self) {
         // In the original, this waits for VSync and sets NCK
         self.sequence_active = false;

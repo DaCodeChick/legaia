@@ -140,7 +140,6 @@ pub struct DebugText;
 /// System to render debug text
 ///
 /// In the future, this will implement the full printf-style formatting
-/// from the original debug_printf (0x8001a068)
 pub fn render_debug_text(debug_renderer: Res<DebugRenderer>, mut gizmos: Gizmos) {
     if !debug_renderer.enabled {
         return;

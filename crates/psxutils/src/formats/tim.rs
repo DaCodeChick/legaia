@@ -279,6 +279,15 @@ impl Tim {
             )));
         }
 
+        // Validate flags field more strictly (from jPSXdec TimValidator line 84)
+        // Only bits 0-3 are used: bits 0-1 for BPP, bit 3 for hasClut
+        if (header.flags & 0xFFF4) != 0 {
+            return Err(PsxError::InvalidFormat(format!(
+                "Invalid TIM flags: 0x{:08X} (reserved bits set)",
+                header.flags
+            )));
+        }
+
         let pixel_mode = PixelMode::from_u32(header.flags)?;
         let has_clut = (header.flags & 0x8) != 0;
 
@@ -300,20 +309,27 @@ impl Tim {
 
             let clut_data_size = (clut_header.size as usize).saturating_sub(12);
 
-            // Sanity check for CLUT size
-            const MAX_CLUT_SIZE: usize = 256 * 2; // 256 colors * 2 bytes max
-            if clut_data_size > MAX_CLUT_SIZE {
+            // Use jPSXdec's CLUT size limit (TimValidator line 298)
+            const CLUT_MAX_BYTE_SIZE: usize =
+                (MAX_TIM_WORD_WIDTH as usize * 2 * MAX_TIM_HEIGHT as usize) + 12;
+            if clut_data_size > CLUT_MAX_BYTE_SIZE || (clut_header.size % 2 != 0) {
                 return Err(PsxError::InvalidFormat(format!(
-                    "TIM CLUT data size too large: {} bytes (max {} bytes)",
-                    clut_data_size, MAX_CLUT_SIZE
+                    "TIM CLUT data size invalid: {} bytes (max {} bytes)",
+                    clut_data_size, CLUT_MAX_BYTE_SIZE
                 )));
             }
 
-            // Validate CLUT dimensions
-            if clut_header.width > MAX_TIM_WORD_WIDTH || clut_header.height > MAX_TIM_HEIGHT {
+            // Validate CLUT dimensions (TimValidator lines 319, 335, 350, 367)
+            if clut_header.width == 0 || clut_header.width > MAX_TIM_WORD_WIDTH {
                 return Err(PsxError::InvalidFormat(format!(
-                    "TIM CLUT dimensions too large: {}x{} (max {}x{})",
-                    clut_header.width, clut_header.height, MAX_TIM_WORD_WIDTH, MAX_TIM_HEIGHT
+                    "TIM CLUT width out of range: {} (must be 1-{})",
+                    clut_header.width, MAX_TIM_WORD_WIDTH
+                )));
+            }
+            if clut_header.height == 0 || clut_header.height > MAX_TIM_HEIGHT {
+                return Err(PsxError::InvalidFormat(format!(
+                    "TIM CLUT height out of range: {} (must be 1-{})",
+                    clut_header.height, MAX_TIM_HEIGHT
                 )));
             }
 
@@ -341,20 +357,27 @@ impl Tim {
 
         let pixel_data_size = (pixel_header.size as usize).saturating_sub(12);
 
-        // Validate pixel dimensions
-        if pixel_header.width > MAX_TIM_WORD_WIDTH || pixel_header.height > MAX_TIM_HEIGHT {
+        // Validate pixel dimensions (TimValidator lines 157, 172, 187, 226)
+        if pixel_header.width == 0 || pixel_header.width > MAX_TIM_WORD_WIDTH {
             return Err(PsxError::InvalidFormat(format!(
-                "TIM pixel dimensions too large: {}x{} (max {}x{})",
-                pixel_header.width, pixel_header.height, MAX_TIM_WORD_WIDTH, MAX_TIM_HEIGHT
+                "TIM pixel width out of range: {} (must be 1-{})",
+                pixel_header.width, MAX_TIM_WORD_WIDTH
+            )));
+        }
+        if pixel_header.height == 0 || pixel_header.height > MAX_TIM_HEIGHT {
+            return Err(PsxError::InvalidFormat(format!(
+                "TIM pixel height out of range: {} (must be 1-{})",
+                pixel_header.height, MAX_TIM_HEIGHT
             )));
         }
 
-        // Sanity check: calculate maximum possible size based on dimensions
-        let max_possible_size = (MAX_TIM_WORD_WIDTH as usize * 2 * MAX_TIM_HEIGHT as usize) + 12;
-        if pixel_data_size > max_possible_size {
+        // Use jPSXdec's max size calculation (TimValidator line 137)
+        const MAX_POSSIBLE_TIM_DATA_SIZE: usize =
+            (MAX_TIM_WORD_WIDTH as usize * 2 * MAX_TIM_HEIGHT as usize) + 12;
+        if pixel_data_size > MAX_POSSIBLE_TIM_DATA_SIZE {
             return Err(PsxError::InvalidFormat(format!(
                 "TIM pixel data size too large: {} bytes (max {} bytes)",
-                pixel_data_size, max_possible_size
+                pixel_data_size, MAX_POSSIBLE_TIM_DATA_SIZE
             )));
         }
 
@@ -364,14 +387,27 @@ impl Tim {
             ));
         }
 
+        // Check consistency (jPSXdec TimValidator lines 242-252)
+        // Allow +2 bytes tolerance for weird TIMs
+        let expected_pixel_size =
+            (pixel_header.width as usize * 2 * pixel_header.height as usize) + 12;
+        if pixel_header.size < expected_pixel_size as u32
+            || pixel_header.size > (expected_pixel_size + 2) as u32
+        {
+            return Err(PsxError::InvalidFormat(format!(
+                "TIM pixel size inconsistent: header says {} bytes, but dimensions require {} bytes",
+                pixel_header.size, expected_pixel_size
+            )));
+        }
+
         total_size += 12 + pixel_data_size;
 
-        // Calculate actual pixel dimensions
+        // Calculate actual pixel dimensions using jPSXdec's formula (Tim.java line 241)
         let width = match pixel_mode {
-            PixelMode::Clut4Bit => pixel_header.width * 4,
-            PixelMode::Clut8Bit => pixel_header.width * 2,
-            PixelMode::Direct16Bit => pixel_header.width,
-            PixelMode::Direct24Bit => pixel_header.width * 2 / 3,
+            PixelMode::Clut4Bit => pixel_header.width * 4, // iWordWidth * 2 * 2
+            PixelMode::Clut8Bit => pixel_header.width * 2, // iWordWidth * 2
+            PixelMode::Direct16Bit => pixel_header.width,  // iWordWidth
+            PixelMode::Direct24Bit => pixel_header.width * 2 / 3, // iWordWidth * 2 / 3
             PixelMode::Mixed => pixel_header.width,
         };
 

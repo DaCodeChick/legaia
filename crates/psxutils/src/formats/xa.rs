@@ -132,39 +132,39 @@ impl SubMode {
     pub const MASK_VIDEO: u8 = 0x02;
     pub const MASK_END_OF_RECORD: u8 = 0x01;
 
-    pub fn from_byte(byte: u8) -> Self {
+    pub const fn from_byte(byte: u8) -> Self {
         Self { bits: byte }
     }
 
-    pub fn is_end_of_file(&self) -> bool {
+    pub const fn is_end_of_file(&self) -> bool {
         self.bits & Self::MASK_END_OF_FILE != 0
     }
 
-    pub fn is_real_time(&self) -> bool {
+    pub const fn is_real_time(&self) -> bool {
         self.bits & Self::MASK_REAL_TIME != 0
     }
 
-    pub fn is_form2(&self) -> bool {
+    pub const fn is_form2(&self) -> bool {
         self.bits & Self::MASK_FORM != 0
     }
 
-    pub fn is_trigger(&self) -> bool {
+    pub const fn is_trigger(&self) -> bool {
         self.bits & Self::MASK_TRIGGER != 0
     }
 
-    pub fn is_data(&self) -> bool {
+    pub const fn is_data(&self) -> bool {
         self.bits & Self::MASK_DATA != 0
     }
 
-    pub fn is_audio(&self) -> bool {
+    pub const fn is_audio(&self) -> bool {
         self.bits & Self::MASK_AUDIO != 0
     }
 
-    pub fn is_video(&self) -> bool {
+    pub const fn is_video(&self) -> bool {
         self.bits & Self::MASK_VIDEO != 0
     }
 
-    pub fn is_end_of_record(&self) -> bool {
+    pub const fn is_end_of_record(&self) -> bool {
         self.bits & Self::MASK_END_OF_RECORD != 0
     }
 
@@ -172,7 +172,7 @@ impl SubMode {
     ///
     /// Data, Audio, and Video bits should be mutually exclusive
     /// (only one of these three flags should be set)
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         let dav_bits = (self.bits >> 1) & 0x07; // Extract bits 3,2,1 (Data, Audio, Video)
         let count = dav_bits.count_ones();
         count <= 1 // At most one of Data/Audio/Video should be set
@@ -215,12 +215,12 @@ impl CodingInfo {
     const MASK_EMPHASIS: u8 = 0x40; // Bit 6
     const MASK_RESERVED: u8 = 0x2A; // Bits 5, 3, 1 (reserved, must be 0)
 
-    pub fn from_byte(byte: u8) -> Self {
+    pub const fn from_byte(byte: u8) -> Self {
         Self { bits: byte }
     }
 
     /// Get bits per sample (4 or 8)
-    pub fn bits_per_sample(&self) -> u8 {
+    pub const fn bits_per_sample(&self) -> u8 {
         if self.bits & Self::MASK_BITS_PER_SAMPLE == 0 {
             4
         } else {
@@ -229,7 +229,7 @@ impl CodingInfo {
     }
 
     /// Get sample rate in Hz (37800 or 18900)
-    pub fn sample_rate(&self) -> u32 {
+    pub const fn sample_rate(&self) -> u32 {
         if self.bits & Self::MASK_SAMPLE_RATE == 0 {
             37800
         } else {
@@ -238,19 +238,19 @@ impl CodingInfo {
     }
 
     /// Check if stereo (true) or mono (false)
-    pub fn is_stereo(&self) -> bool {
+    pub const fn is_stereo(&self) -> bool {
         self.bits & Self::MASK_STEREO != 0
     }
 
     /// Check if emphasis flag is set
-    pub fn has_emphasis(&self) -> bool {
+    pub const fn has_emphasis(&self) -> bool {
         self.bits & Self::MASK_EMPHASIS != 0
     }
 
     /// Validate coding info
     ///
     /// Bits 5, 3, and 1 must be 0 (reserved/unused)
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.bits & Self::MASK_RESERVED == 0
     }
 }

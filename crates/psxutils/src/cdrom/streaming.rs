@@ -40,7 +40,7 @@ pub struct CdromStreamParams {
 
 impl CdromStreamParams {
     /// Create new stream parameters
-    pub fn new(sector_count: u32, start_async: bool, wait_complete: bool) -> Self {
+    pub const fn new(sector_count: u32, start_async: bool, wait_complete: bool) -> Self {
         let mut flags = 0u32;
         if start_async {
             flags |= 0x01;
@@ -56,12 +56,12 @@ impl CdromStreamParams {
     }
 
     /// Check if async read should start
-    pub fn should_start_async(&self) -> bool {
+    pub const fn should_start_async(&self) -> bool {
         (self.mode_flags & 0x01) != 0
     }
 
     /// Check if should wait for completion
-    pub fn should_wait_complete(&self) -> bool {
+    pub const fn should_wait_complete(&self) -> bool {
         (self.mode_flags & 0x02) != 0
     }
 }
@@ -81,7 +81,7 @@ pub struct CdromPosition {
 
 impl CdromPosition {
     /// Create a new CD-ROM position
-    pub fn new(minute: u8, second: u8, sector: u8) -> Self {
+    pub const fn new(minute: u8, second: u8, sector: u8) -> Self {
         Self {
             minute,
             second,
@@ -90,7 +90,7 @@ impl CdromPosition {
     }
 
     /// Convert position to absolute sector number
-    pub fn to_sector_number(&self) -> u32 {
+    pub const fn to_sector_number(&self) -> u32 {
         let minutes = self.minute as u32;
         let seconds = self.second as u32;
         let sectors = self.sector as u32;
@@ -100,7 +100,7 @@ impl CdromPosition {
     }
 
     /// Create position from absolute sector number
-    pub fn from_sector_number(sector: u32) -> Self {
+    pub const fn from_sector_number(sector: u32) -> Self {
         let minute = (sector / (60 * 75)) as u8;
         let second = ((sector / 75) % 60) as u8;
         let sector = (sector % 75) as u8;

@@ -41,7 +41,7 @@ impl PixelMode {
     }
 
     /// Returns the bits per pixel for this mode
-    pub fn bits_per_pixel(&self) -> u8 {
+    pub const fn bits_per_pixel(&self) -> u8 {
         match self {
             Self::Clut4Bit => 4,
             Self::Clut8Bit => 8,

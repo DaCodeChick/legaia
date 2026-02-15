@@ -19,6 +19,8 @@ PlayStation 1 utilities for parsing game assets and formats.
 
 LZSS is a dictionary-based compression algorithm commonly used in PS1 games. Legend of Legaia uses it for various game assets (identified by `.lzs` extension).
 
+**File Format**: LZSS-compressed files typically start with the magic number `sszl` ("lzss" reversed) as the first 4 bytes.
+
 **Library Usage:**
 
 ```rust

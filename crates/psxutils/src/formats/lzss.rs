@@ -177,11 +177,29 @@ impl LzssDecoder {
 
 /// Decompress LZSS data with standard configuration
 ///
+/// Legend of Legaia LZSS magic number: "sszl" (little-endian)
+pub const LZSS_MAGIC: &[u8; 4] = b"sszl";
+
+/// Strips the 'sszl' magic number header if present
+///
+/// Legend of Legaia LZSS files typically start with 'sszl' (0x73 0x73 0x7A 0x6C).
+/// This function returns a slice starting after the magic number, or the original
+/// slice if the magic number is not present.
+pub fn strip_magic(data: &[u8]) -> &[u8] {
+    if data.len() >= 4 && &data[0..4] == LZSS_MAGIC {
+        &data[4..]
+    } else {
+        data
+    }
+}
+
 /// Convenience function for one-shot decompression.
+///
+/// Automatically strips the 'sszl' magic number if present.
 ///
 /// # Arguments
 ///
-/// * `compressed` - Compressed input data
+/// * `compressed` - Compressed input data (with or without 'sszl' header)
 ///
 /// # Returns
 ///
@@ -197,7 +215,8 @@ impl LzssDecoder {
 /// # Ok::<(), std::io::Error>(())
 /// ```
 pub fn decompress(compressed: &[u8]) -> io::Result<Vec<u8>> {
-    LzssDecoder::standard().decompress_buf(compressed)
+    let data = strip_magic(compressed);
+    LzssDecoder::standard().decompress_buf(data)
 }
 
 #[cfg(test)]
@@ -247,6 +266,37 @@ mod tests {
         assert!(decoder.window.iter().all(|&b| b == 0));
     }
 
+    #[test]
+    fn test_strip_magic() {
+        // Test with magic number present
+        let with_magic = b"sszl\xFF\x01\x02\x03";
+        let stripped = strip_magic(with_magic);
+        assert_eq!(stripped, &[0xFF, 0x01, 0x02, 0x03]);
+
+        // Test without magic number
+        let without_magic = b"\xFF\x01\x02\x03";
+        let stripped = strip_magic(without_magic);
+        assert_eq!(stripped, &[0xFF, 0x01, 0x02, 0x03]);
+
+        // Test with partial magic (should not strip)
+        let partial = b"ssz\xFF";
+        let stripped = strip_magic(partial);
+        assert_eq!(stripped, &b"ssz\xFF"[..]);
+    }
+
+    #[test]
+    fn test_decompress_with_magic() {
+        // Test decompression with magic number header
+        let mut data = b"sszl".to_vec();
+        data.extend_from_slice(&[
+            0xFF, // Control: 8 literals
+            b'H', b'e', b'l', b'l', b'o', b' ', b'P', b'S',
+        ]);
+
+        let result = decompress(&data).unwrap();
+        assert_eq!(result, b"Hello PS");
+    }
+}
     #[test]
     fn test_config_standard() {
         let config = LzssConfig::standard();

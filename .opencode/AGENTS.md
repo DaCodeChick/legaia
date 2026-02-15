@@ -1147,6 +1147,52 @@ Total: 1,121 functions | Status: 21 Complete, 1,100 Remaining (1.9% progress)
 | 0x8003d254 | gte_load_h_register | **✅ Complete** | Graphics | GTE H register loader (wrapper). Session #3. |
 | ... | ... | Unanalyzed | ... | ... |
 
+#### State Handlers (0x80025b30-0x800565d8)
+Total: 12 handlers | Status: 12 Complete (100% coverage)
+
+| Address    | Function Name | Status | System | Notes |
+|------------|---------------|--------|--------|-------|
+| 0x80025c68 | state_handler_0_initial_load | **✅ Complete** | Core | Initial loading, audio setup. Session 2026-02-15. |
+| 0x80025eec | state_handler_1_main_game_loop | **✅ Complete** | Core | Main gameplay loop (field/world). Session 2026-02-15. |
+| 0x80025b64 | state_handler_2_load_data | **✅ Complete** | Core | Loads CD-ROM data index 2. Session 2026-02-15. |
+| 0x8002611c | state_handler_3_reset_to_initial | **✅ Complete** | Core | Resets to state 0. Session 2026-02-15. |
+| 0x80025e68 | state_handler_4_load_effects | **✅ Complete** | Core | Loads visual effects (index 0x54). Session 2026-02-15. |
+| 0x8002b97c | state_handler_5_noop | **✅ Complete** | Core | Empty stub (unused). Session 2026-02-15. |
+| 0x80025da0 | state_handler_6_battle_menu_load | **✅ Complete** | Battle | Battle/menu data loading. Session 2026-02-15. |
+| 0x80025f2c | state_handler_7_render_variant | **✅ Complete** | Core | Render loop variant. Session 2026-02-15. |
+| 0x8002b904 | state_handler_8_reset_to_initial | **✅ Complete** | Core | Resets to state 0. Session 2026-02-15. |
+| 0x8002612c | state_handler_9_unknown_handler | **✅ Complete** | Core | Unknown purpose. Session 2026-02-15. |
+| 0x80025b30 | state_handler_10_load_data_7 | **✅ Complete** | Core | Loads CD-ROM data index 7. Session 2026-02-15. |
+| 0x800565d8 | state_handler_11_battle_handler | **✅ Complete** | Battle | Battle system entry point. Session 2026-02-15. |
+
+#### Battle System Functions (0x80052770-0x80055d84)
+Total: ~50 functions (estimated) | Status: 6 Complete, ~44 Remaining
+
+| Address    | Function Name | Status | System | Notes |
+|------------|---------------|--------|--------|-------|
+| 0x80055b6c | battle_system_main | **✅ Complete** | Battle | Battle init & loop (138 lines, 81 symbols). Session 2026-02-15. |
+| 0x80055b20 | init_default_party_slots | **✅ Complete** | Battle | Sets party slots 0-2 (chars 1, 2, 3). Session 2026-02-15. |
+| 0x8005567c | init_battle_participants | **✅ Complete** | Battle | Configures enemies based on encounter ID. Session 2026-02-15. |
+| 0x80052770 | load_player_battle_data | **✅ Complete** | Battle | **Player data loader (2,096 bytes, 37 symbols, 10 states). Session 2026-02-15.** |
+| 0x800558fc | queue_cdrom_load | **✅ Complete** | Battle | Queues CD-ROM load operation. Session 2026-02-15. |
+| 0x800559ec | execute_cdrom_read | **✅ Complete** | Battle | Executes CD-ROM read to buffer. Session 2026-02-15. |
+| 0x80055a5c | seek_cdrom_position | **✅ Complete** | Battle | Seeks to CD-ROM file offset. Session 2026-02-15. |
+| 0x80055ac8 | cancel_cdrom_operation | **✅ Complete** | Battle | Cancels active CD-ROM operation. Session 2026-02-15. |
+| 0x80024e80 | load_battle_resource | Identified | Battle | Loads battle graphics resources. Needs DICK analysis. |
+| 0x80020de0 | init_battle_graphics | Identified | Battle | Initializes battle rendering system. Needs DICK analysis. |
+| 0x800353e0 | init_battle_audio | Identified | Battle | Initializes battle audio. Needs DICK analysis. |
+| 0x80054a6c | handle_special_battle_mode | Identified | Battle | Handles special battle mode. Needs DICK analysis. |
+| ??? | **COMBAT LOOP (UNKNOWN)** | **Unidentified** | Battle | **CRITICAL: Real AI/damage formulas NOT YET FOUND!** |
+| ... | ... | Unanalyzed | Battle | ... |
+
+**Recently Completed (2026-02-15 State Machine & Battle):**
+- ✅ All 12 state handlers - 100% DICK compliance (125 lines total)
+- ✅ battle_system_main() - Battle initialization loop (138 lines, 81 symbols renamed)
+- ✅ load_player_battle_data() - Player data loading state machine (2,096 bytes, 37 symbols, 10 phases)
+- ✅ 4 CD-ROM helper functions (queue, execute, seek, cancel)
+- ✅ IMPORTANT DISCOVERY: load_player_battle_data is NOT the combat loop (misnamed previously)
+- ⚠️ **CRITICAL FINDING**: Real combat AI/damage formulas still not located!
+
 **Recently Completed (2026-02-14 DICK Session #3):**
 - ✅ init_data_tables() - Data table initialization (14 globals)
 - ✅ init_game_state() - Comprehensive game state init (52+ globals for GPU, camera, sprites, input)

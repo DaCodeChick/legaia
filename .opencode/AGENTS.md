@@ -1190,12 +1190,39 @@ ItemData* get_item_data(int item_id) {
 
 ### File Formats
 - **TIM**: PSX texture format
+- **TMD**: Standard PSX 3D model format (NOT used by Legend of Legaia - see below)
 - **VAB**: Voice Attribute Bank (audio samples + metadata)
 - **VAG**: Individual audio sample format
 - **STR**: Streaming video format
 - **XA**: CD-XA audio format
 
-### Legend of Legaia Specific
+### Legend of Legaia Specific Formats
+
+#### Custom 3D Model Format (Discovered 2026-02-15)
+Legend of Legaia uses a **custom 3D model format**, NOT standard PSX TMD files.
+
+**Key Findings:**
+- No standard TMD files (magic `0x00000041`) found in PROT.DAT archive
+- 92 files previously identified as "TMD" have signature `0x80000002` at offset +4
+- These files have different header structure than standard TMD
+- First 4 bytes vary (0x0000383c, 0x00002998, 0x00002c20, etc.) - likely file size or offset
+- Offset +8 consistently reads as 0 for "num_objects", indicating different structure
+
+**Example Files:**
+- file_0005.bin: Starts with `3c38 0000 0200 0080 0000 0000 0200 0000`
+- file_0100.bin: Starts with `8036 0000 0200 0080 0000 0000 0200 0000`
+- Pattern: `[varying_id] [02000080] [00000000] [02000000] [data...]`
+
+**Status:** Format needs further reverse engineering to identify structure
+**Next Steps:** 
+1. Analyze file structure in Ghidra
+2. Look for 3D-related functions in game executable
+3. Create custom parser once format is understood
+4. Document findings here
+
+**Note:** The standard TMD parser in `psxutils/src/formats/tmd.rs` is complete and ready for use with standard PSX TMD files from other games/sources.
+
+### Legend of Legaia Resources
 - [The Cutting Room Floor](https://tcrf.net/Legend_of_Legaia) - Unused content and debug info
 - Community speedrun resources
 - Fan sites with game data

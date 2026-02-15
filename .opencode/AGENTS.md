@@ -1396,6 +1396,112 @@ Okay, maybe it's just "Decompile It Correctly, Knucklehead" without a clever acr
 
 ---
 
-*Last Updated: 2026-02-14*  
-*Status: Strengthened enforcement after incomplete main() analysis*  
-*Next Review: After first function reaches TRUE "Complete" status (zero unnamed symbols)*
+## 📚 jPSXdec Reference Implementation
+
+**CRITICAL**: When implementing asset extraction, use jPSXdec as the reference, not guesswork.
+
+### jPSXdec Source
+- **Repository**: https://github.com/m35/jpsxdec
+- **Local copy**: `/tmp/jpsxdec/`
+- **Extracted tool**: `/tmp/jpsxdec_v2.0/jpsxdec.jar`
+- **Index file**: `/tmp/jpsxdec_v2.0/all` (shows what jPSXdec found on disc)
+
+### Key Implementation Files
+
+#### TIM Texture Scanning
+- **Validator**: `jpsxdec/src/jpsxdec/tim/TimValidator.java`
+  - Line 59: `MAX_TIM_WORD_WIDTH = 16384` (NOT arbitrary 10MB limit)
+  - Line 64: `MAX_TIM_HEIGHT = 8192`
+  - Line 137: `MAX_POSSIBLE_TIM_DATA_SIZE = MAX_TIM_WORD_WIDTH * 2 * MAX_TIM_HEIGHT + HEADER_SIZE`
+- **Scanner**: `jpsxdec/src/jpsxdec/tim/CreateTim.java`
+  - `isTim()` method: Validates headers WITHOUT allocating pixel data
+  - Line 93: `IO.skip(inStream, validator.getClutImageDataByteSize())` - SKIPS data, doesn't read
+  - Line 116: `IO.skip(inStream, validator.getImageDataByteSize())` - SKIPS data, doesn't read
+  - Only reads pixel data AFTER all validation passes
+- **Indexer**: `jpsxdec/src/jpsxdec/modules/tim/DiscIndexerTim.java`
+  - Uses streaming approach with `DemuxPushInputStream`
+  - Processes sector-by-sector, not loading entire files
+  - Line 103: `while (_stream.available() > Tim.MINIMUM_TIM_SIZE)` - only needs header bytes
+
+#### What jPSXdec Actually Scans
+From Legend of Legaia disc analysis:
+- ✅ **1132 TIM textures** in PROT.DAT
+- ✅ **322 XA audio files** (in XA/*.XA files)
+- ✅ **6 STR video files** (MOV/MV1.STR through MV6.STR)
+- ✅ **45 regular files** (ISO 9660 filesystem)
+- ❌ **Does NOT scan for TMD models** (not found by jPSXdec)
+- ❌ **Does NOT scan for VAG audio** in PROT.DAT (not found by jPSXdec)
+
+### Critical Lessons Learned (2026-02-15)
+
+#### OOM Error Root Cause
+**Problem**: Scanner caused out-of-memory by allocating huge vectors for corrupt data
+
+**Bad Approach (what we did wrong)**:
+```rust
+// DON'T DO THIS - allocates memory during validation!
+fn scan_tim(&self) -> Vec<DiscoveredAsset> {
+    if magic == TIM_MAGIC {
+        if let Ok(tim) = Tim::parse(&self.data[offset..]) {  // ❌ Parses AND allocates
+            let size = tim.data_size();
+            // ...
+        }
+    }
+}
+```
+
+**Correct Approach (from jPSXdec)**:
+```rust
+// DO THIS - validate headers WITHOUT allocating pixel data
+fn scan_tim(&self) -> Vec<DiscoveredAsset> {
+    if magic == TIM_MAGIC {
+        if let Ok((width, height, size)) = Tim::validate(&self.data[offset..]) {  // ✅ Only validates
+            // No pixel data allocated!
+            // Skip past TIM and continue
+        }
+    }
+}
+```
+
+#### Key Validation Pattern
+1. **Read header bytes** (8-12 bytes for TIM)
+2. **Validate magic number** (0x00000010 for TIM)
+3. **Validate dimensions** against MAX limits (not arbitrary size)
+4. **Calculate expected size** from header fields
+5. **Check if data available** in buffer
+6. **SKIP (don't read)** the pixel data
+7. **Return metadata only** (offset, size, dimensions)
+
+#### Size Limits Must Match jPSXdec
+- ❌ `const MAX_REASONABLE_SIZE: usize = 10 * 1024 * 1024;` // Wrong! Arbitrary
+- ✅ `const MAX_TIM_WORD_WIDTH: u16 = 16384;` // Correct! From jPSXdec
+- ✅ `const MAX_TIM_HEIGHT: u16 = 8192;` // Correct! From jPSXdec
+- ✅ `const MAX_POSSIBLE_SIZE = MAX_TIM_WORD_WIDTH * 2 * MAX_TIM_HEIGHT + 12;` // Calculated
+
+#### When Implementing New Format Scanners
+1. ❌ **DON'T GUESS** - Don't make up size limits or validation logic
+2. ✅ **READ jPSXdec source** - Find the validator class first
+3. ✅ **COPY their limits** - Use exact same max dimensions/sizes
+4. ✅ **SKIP, don't READ** - Validate headers, skip data
+5. ✅ **TEST with real data** - Run against actual disc images
+
+### Scanner Performance Results
+- **Before fix**: OOM crash on chunk 2 (259GB allocation attempt)
+- **After fix**: Successfully scanned all 115MB of PROT.DAT
+  - Chunk size: 5MB
+  - Found: 872 TIM textures (77% of jPSXdec's 1132)
+  - Memory usage: ~5MB per chunk (no accumulation)
+  - Time: ~30 seconds for full scan
+
+### Why We Found 872/1132 TIMs (77%)
+Possible reasons for missing 260 textures:
+1. Chunk boundary issues (TIMs split across 5MB chunks)
+2. min_size filter of 64 bytes excluding tiny TIMs
+3. Alignment requirements we're missing
+4. Need to investigate jPSXdec's sector-based approach more
+
+---
+
+*Last Updated: 2026-02-15*  
+*Status: Added jPSXdec reference after OOM fix*  
+*Next: Investigate missing 260 TIMs and implement XA/STR scanning*

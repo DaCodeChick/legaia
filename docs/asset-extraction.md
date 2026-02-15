@@ -55,21 +55,33 @@ image::save_buffer(
 - Face indices (triangles/quads)
 - Material references
 
-**Conversion:** (TODO: Implement TMD parser)
+**Conversion:**
 ```rust
-// Future API:
 use psxutils::formats::Tmd;
+use legaia_assets::converter::tmd_to_gltf;
 
+// Parse TMD file
 let tmd_data = std::fs::read("model.tmd")?;
 let tmd = Tmd::parse(&tmd_data)?;
 
 // Export as glTF 2.0
-let gltf = tmd.to_gltf();
-std::fs::write("model.gltf", gltf.to_json()?)?;
+tmd_to_gltf(&tmd, Path::new("model.gltf"))?;
+// Creates: model.gltf (JSON) + model.bin (binary buffer)
+```
+
+**CLI Usage:**
+```bash
+# Convert TMD to glTF
+./target/release/legaia-extract convert-tmd model.TMD model.gltf
+
+# Show model info
+./target/release/legaia-extract info-tmd model.TMD
 ```
 
 **Target Format:** glTF 2.0 (JSON + binary buffers)
 **Bevy Loading:** `asset_server.load::<Scene>("models/model.gltf#Scene0")`
+
+**Current Status:** ✅ Implemented (vertices exported as point cloud; full primitive parsing in progress)
 
 ### 3. Audio Samples (VAG → WAV)
 
@@ -87,7 +99,7 @@ let vag_data = std::fs::read("sound.vag")?;
 let vag = Vag::parse(&vag_data)?;
 
 // Decode ADPCM to PCM16
-let pcm_samples = vag.decode_to_pcm16();
+let pcm_samples = vag.decode_to_pcm();
 let sample_rate = vag.sample_rate;
 
 // Save as WAV
@@ -105,8 +117,16 @@ for sample in pcm_samples {
 wav_writer.finalize()?;
 ```
 
+**CLI Usage:**
+```bash
+# Convert VAG to WAV
+./target/release/legaia-extract convert-vag sound.VAG sound.wav
+```
+
 **Target Format:** WAV (PCM16, 44.1kHz) or OGG Vorbis (compressed)
 **Bevy Loading:** `asset_server.load::<AudioSource>("audio/sound.ogg")`
+
+**Current Status:** ✅ Implemented
 
 ### 4. Sound Banks (VAB → Individual WAV files)
 

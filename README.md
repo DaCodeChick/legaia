@@ -118,14 +118,20 @@ cargo build --release -p legaia-assets
 # Convert TIM texture to PNG
 ./target/release/legaia-extract convert-tim input.TIM output.png
 
+# Convert VAG audio to WAV
+./target/release/legaia-extract convert-vag input.VAG output.wav
+
+# Convert TMD model to glTF
+./target/release/legaia-extract convert-tmd model.TMD model.gltf
+
 # Show TMD model info
 ./target/release/legaia-extract info-tmd model.TMD
 ```
 
 **Supported Formats:**
 - ✅ **TIM** (textures) → PNG conversion
-- ✅ **TMD** (3D models) → Info display (glTF export planned)
-- ✅ **VAG** (audio samples) → Parser ready (WAV export planned)
+- ✅ **TMD** (3D models) → glTF 2.0 export
+- ✅ **VAG** (audio samples) → WAV conversion
 - ✅ **VAB** (sound banks) → Parser ready
 - ✅ **CD-ROM ISO 9660** → File extraction
 

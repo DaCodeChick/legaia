@@ -6,14 +6,13 @@
 //! - Managing asset manifests and metadata
 //! - Organizing assets for the game engine
 
-pub mod extractor;
-pub mod manifest;
 pub mod converter;
+pub mod extractor;
 pub mod formats;
+pub mod manifest;
 
 pub use extractor::AssetExtractor;
-pub use manifest::{AssetManifest, AssetEntry};
-pub use converter::AssetConverter;
+pub use manifest::{AssetEntry, AssetManifest};
 
 use thiserror::Error;
 
@@ -21,16 +20,16 @@ use thiserror::Error;
 pub enum AssetError {
     #[error("Failed to read disc image: {0}")]
     DiscReadError(#[from] std::io::Error),
-    
+
     #[error("Invalid asset format: {0}")]
     InvalidFormat(String),
-    
+
     #[error("Asset not found at address {0:#X}")]
     AssetNotFound(u32),
-    
+
     #[error("Conversion failed: {0}")]
     ConversionError(String),
-    
+
     #[error("Manifest error: {0}")]
     ManifestError(String),
 }

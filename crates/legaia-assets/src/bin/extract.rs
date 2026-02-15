@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use legaia_assets::converter::tmd_to_gltf;
 use psxutils::cdrom::CdRom;
 use psxutils::formats::{Tim, Tmd, Vag};
 use std::fs;
@@ -72,6 +73,15 @@ enum Commands {
         input: PathBuf,
     },
 
+    /// Convert TMD model to glTF
+    ConvertTmd {
+        /// Input TMD file
+        input: PathBuf,
+
+        /// Output glTF file (.gltf)
+        output: PathBuf,
+    },
+
     /// Extract all assets from disc
     ExtractAll {
         /// Path to PSX disc image (.bin file)
@@ -107,6 +117,7 @@ fn main() -> Result<()> {
         Commands::ConvertTim { input, output } => convert_tim(&input, &output)?,
         Commands::ConvertVag { input, output } => convert_vag(&input, &output)?,
         Commands::InfoTmd { input } => info_tmd(&input)?,
+        Commands::ConvertTmd { input, output } => convert_tmd(&input, &output)?,
         Commands::ExtractAll {
             disc,
             output,
@@ -185,13 +196,28 @@ fn convert_vag(input: &PathBuf, output: &PathBuf) -> Result<()> {
     info!("Parsing VAG...");
     let vag = Vag::parse(&data)?;
 
-    warn!("VAG to WAV conversion not yet implemented");
-    warn!("VAG info: {} Hz, {} bytes", vag.sample_rate, data.len());
+    info!(
+        "Decoding ADPCM: {} Hz, {:.2}s duration",
+        vag.sample_rate,
+        vag.duration_secs()
+    );
+    let pcm_samples = vag.decode_to_pcm();
 
-    // TODO: Implement VAG decode and WAV writing
-    // For now, just copy the raw data
-    fs::write(output, &data)?;
+    info!("Writing WAV: {}", output.display());
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: vag.sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
 
+    let mut writer = hound::WavWriter::create(output, spec)?;
+    for sample in pcm_samples {
+        writer.write_sample(sample)?;
+    }
+    writer.finalize()?;
+
+    info!("Conversion complete!");
     Ok(())
 }
 
@@ -214,6 +240,22 @@ fn info_tmd(input: &PathBuf) -> Result<()> {
         println!("    Scale: {}", obj.scale);
     }
 
+    Ok(())
+}
+
+fn convert_tmd(input: &PathBuf, output: &PathBuf) -> Result<()> {
+    info!("Reading TMD: {}", input.display());
+    let data = fs::read(input)?;
+
+    info!("Parsing TMD...");
+    let tmd = Tmd::parse(&data)?;
+
+    info!("Converting to glTF ({} objects)...", tmd.object_count());
+    tmd_to_gltf(&tmd, output)?;
+
+    info!("Saved glTF to: {}", output.display());
+    info!("Binary buffer: {}", output.with_extension("bin").display());
+    info!("Conversion complete!");
     Ok(())
 }
 
@@ -258,6 +300,10 @@ fn extract_all(disc_path: &PathBuf, output_dir: &PathBuf, asset_type: &str) -> R
                 // Try to convert if it's a known format
                 let converted = if entry.name.ends_with(".TIM") {
                     convert_tim_data(&data, &output_path.with_extension("png"))
+                } else if entry.name.ends_with(".VAG") {
+                    convert_vag_data(&data, &output_path.with_extension("wav"))
+                } else if entry.name.ends_with(".TMD") {
+                    convert_tmd_data(&data, &output_path.with_extension("gltf"))
                 } else {
                     false
                 };
@@ -310,6 +356,64 @@ fn convert_tim_data(data: &[u8], output_path: &PathBuf) -> bool {
         },
         Err(e) => {
             warn!("Failed to parse TIM: {}", e);
+            false
+        }
+    }
+}
+
+fn convert_vag_data(data: &[u8], output_path: &PathBuf) -> bool {
+    match Vag::parse(data) {
+        Ok(vag) => {
+            let pcm_samples = vag.decode_to_pcm();
+
+            let spec = hound::WavSpec {
+                channels: 1,
+                sample_rate: vag.sample_rate,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+
+            match hound::WavWriter::create(output_path, spec) {
+                Ok(mut writer) => {
+                    for sample in pcm_samples {
+                        if let Err(e) = writer.write_sample(sample) {
+                            warn!("Failed to write WAV sample: {}", e);
+                            return false;
+                        }
+                    }
+                    if let Err(e) = writer.finalize() {
+                        warn!("Failed to finalize WAV: {}", e);
+                        return false;
+                    }
+                    info!("  -> Converted to WAV: {}", output_path.display());
+                    true
+                }
+                Err(e) => {
+                    warn!("Failed to create WAV writer: {}", e);
+                    false
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Failed to parse VAG: {}", e);
+            false
+        }
+    }
+}
+
+fn convert_tmd_data(data: &[u8], output_path: &PathBuf) -> bool {
+    match Tmd::parse(data) {
+        Ok(tmd) => {
+            if let Err(e) = tmd_to_gltf(&tmd, output_path) {
+                warn!("Failed to convert TMD to glTF: {}", e);
+                false
+            } else {
+                info!("  -> Converted to glTF: {}", output_path.display());
+                true
+            }
+        }
+        Err(e) => {
+            warn!("Failed to parse TMD: {}", e);
             false
         }
     }

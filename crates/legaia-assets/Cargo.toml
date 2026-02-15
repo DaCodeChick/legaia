@@ -30,6 +30,12 @@ bytemuck = { workspace = true }
 # Image processing for texture conversion
 image = "0.25"
 
+# Audio processing for WAV output
+hound = "3.5"
+
+# 3D model export (glTF)
+gltf-json = "1.4"
+
 # CLI for extraction tool
 clap = { workspace = true }
 tracing = { workspace = true }

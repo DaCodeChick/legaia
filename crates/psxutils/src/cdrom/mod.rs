@@ -125,7 +125,25 @@ impl CdRom {
         Ok(())
     }
 
+    /// Read a raw sector at the given LBA (all 2352 bytes)
+    ///
+    /// Returns the complete raw sector including sync pattern, header, and data.
+    pub fn read_raw_sector(&self, lba: u32) -> Result<&[u8]> {
+        let offset = lba as usize * SECTOR_SIZE;
+
+        if offset + SECTOR_SIZE > self.mmap.len() {
+            return Err(PsxError::ParseError(format!(
+                "Sector {} out of bounds",
+                lba
+            )));
+        }
+
+        Ok(&self.mmap[offset..offset + SECTOR_SIZE])
+    }
+
     /// Read a sector at the given LBA (Logical Block Address)
+    ///
+    /// Returns only the 2048-byte data payload (Mode 2 Form 1).
     pub fn read_sector(&self, lba: u32) -> Result<&[u8]> {
         let offset = lba as usize * SECTOR_SIZE;
 

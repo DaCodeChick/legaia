@@ -12,19 +12,45 @@ This project recreates Legend of Legaia for modern platforms by:
 - Reimplementing systems in Rust with Bevy engine
 - Preserving the original game feel while adding modern improvements
 
+# Legend of Legaia Rewrite
+
+A modern rewrite of the classic PSX RPG **Legend of Legaia** using Rust and Bevy.
+
+> ⚠️ **This project is in early development.** Requires a legal retail copy of Legend of Legaia.
+
+## 🎮 About
+
+This project recreates Legend of Legaia for modern platforms with a **clean-room approach**:
+- Extract and convert assets from retail disc image to modern formats
+- Use decompilation to understand **game logic** (battle formulas, AI, events)
+- Build native Bevy ECS systems (NOT PSX hardware emulation)
+- Preserve the original game feel while adding modern improvements
+
+**Philosophy**: We're building a modern game, not a PSX emulator. Decompilation informs implementation but doesn't dictate architecture.
+
 ## 📋 Project Status
 
-- [x] Project structure established
-- [x] Asset extraction framework
-- [x] Engine scaffolding (Bevy)
-- [ ] Asset format parsers (TIM, VAB, VAG)
-- [ ] Decompilation in progress (0/1121 functions)
-- [ ] Battle system
-- [ ] Field system
-- [ ] Menu system
-- [ ] Full playthrough possible
+**Infrastructure:**
+- [x] Project structure and build system
+- [x] Asset extraction CLI (`legaia-extract`)
+- [x] PSX format parsers (TIM ✅, TMD ✅, VAG ✅, VAB ✅, CD-ROM ✅)
+- [x] Modern Bevy engine scaffold
+- [x] Code separation policy (decompilation ≠ Rust code)
 
-See [docs/decompilation/README.md](docs/decompilation/README.md) for detailed progress.
+**Decompilation Progress:**
+- [x] 21/1,121 functions analyzed (1.9%)
+- [x] DICK methodology established
+- [x] 130+ globals renamed and categorized
+- [ ] Focus shift: Game logic only (skip hardware functions)
+
+**Game Systems:**
+- [ ] Battle system (HIGH PRIORITY)
+- [ ] Field/world system
+- [ ] Menu system
+- [ ] Event/scripting system
+- [ ] Save/load system
+
+See [.opencode/AGENTS.md](.opencode/AGENTS.md) for detailed decompilation progress and [docs/asset-extraction.md](docs/asset-extraction.md) for asset workflow.
 
 ## 🏗️ Project Structure
 
@@ -68,29 +94,58 @@ cargo run --release -p legaia-game
 
 ### Extracting Assets
 
-```bash
-# Extract assets from your retail disc
-cargo run --release -p legaia-assets --example extract -- \
-  --input /path/to/Legend_of_Legaia.bin \
-  --output ./crates/legaia-game/assets
+The `legaia-extract` CLI tool handles asset extraction and conversion:
 
-# This will create:
-# - Extracted textures (TIM → PNG)
-# - Converted audio (VAB/VAG → OGG/WAV)
-# - Models and other game data
-# - Asset manifest (manifest.json)
+```bash
+# Build the extraction tool
+cargo build --release -p legaia-assets
+
+# List files on disc
+./target/release/legaia-extract list --disc /path/to/Legend_of_Legaia.bin
+
+# Extract all assets and auto-convert (TIM→PNG, etc.)
+./target/release/legaia-extract extract-all \
+  --disc /path/to/Legend_of_Legaia.bin \
+  --output ./assets \
+  --type all
+
+# Extract specific file
+./target/release/legaia-extract extract \
+  --disc /path/to/Legend_of_Legaia.bin \
+  --file SCUS_942.54 \
+  --output game.exe
+
+# Convert TIM texture to PNG
+./target/release/legaia-extract convert-tim input.TIM output.png
+
+# Show TMD model info
+./target/release/legaia-extract info-tmd model.TMD
 ```
 
-> **Note**: Asset extraction is not yet fully implemented. This is a work in progress.
+**Supported Formats:**
+- ✅ **TIM** (textures) → PNG conversion
+- ✅ **TMD** (3D models) → Info display (glTF export planned)
+- ✅ **VAG** (audio samples) → Parser ready (WAV export planned)
+- ✅ **VAB** (sound banks) → Parser ready
+- ✅ **CD-ROM ISO 9660** → File extraction
+
+See [docs/asset-extraction.md](docs/asset-extraction.md) for detailed workflow.
 
 ## 📚 Documentation
 
-- [Architecture Overview](docs/architecture.md) - System design and game flow
-- [Asset Formats](docs/asset-formats.md) - PSX format specifications
-- [Decompilation Guide](.opencode/AGENTS.md) - DICK methodology for decompilation
-- [Decompilation Progress](docs/decompilation/README.md) - Function analysis tracking
+- [Project Strategy & Decompilation Guide](.opencode/AGENTS.md) - DICK methodology, priorities
+- [Asset Extraction Workflow](docs/asset-extraction.md) - Converting PSX assets to modern formats
+- Architecture docs (coming soon)
 
 ## 🛠️ Development
+
+### Development Philosophy
+
+**Modern Bevy-Native Rewrite:**
+- ✅ Use decompilation for: Battle formulas, AI logic, event scripts, save format
+- ❌ Skip decompilation for: GPU/SPU hardware, rendering, DMA, BIOS calls
+- Build clean Bevy ECS systems, not PSX hardware emulation
+- Extract assets → convert to native formats → load with Bevy
 
 ### Decompilation Workflow
 
@@ -101,7 +156,14 @@ This project follows the **DICK** methodology:
 - Analyze complete call chains
 - Rename EVERY function, parameter, variable, and global
 - Leave nothing unnamed (no `FUN_*`, `param_*`, `local_*`, `DAT_*`)
-- Document as you go
+- Document purpose and behavior (not just mechanics)
+- **Focus on game logic**, skip hardware abstraction
+
+**Priority Systems for Decompilation:**
+1. ⭐⭐⭐ Battle formulas and AI
+2. ⭐⭐ Event/script system
+3. ⭐ Character stats, items, save data
+4. Skip: GPU, SPU, CD-ROM, memory card functions
 
 See [.opencode/AGENTS.md](.opencode/AGENTS.md) for detailed guidelines.
 
@@ -127,40 +189,46 @@ cargo clippy --workspace -- -D warnings
 
 ## 🎯 Roadmap
 
-### Phase 1: Foundation (Current)
-- [x] Project structure
-- [x] Documentation
-- [ ] Asset format parsers (TIM, VAB, VAG)
-- [ ] Asset extraction tool
-- [ ] Basic rendering test
+### Phase 1: Infrastructure ✅ (Current)
+- [x] Project structure and workspace
+- [x] Asset extraction CLI tool (`legaia-extract`)
+- [x] PSX format parsers (TIM, TMD, VAG, VAB, CD-ROM)
+- [x] Modern Bevy engine scaffold
+- [x] Documentation and development guidelines
+- [x] Decompilation methodology (DICK)
 
-### Phase 2: Core Systems
-- [ ] Decompile main loop and initialization
-- [ ] Field system (movement, camera)
-- [ ] Graphics rendering (models, textures)
-- [ ] Input handling
-- [ ] Audio playback
+### Phase 2: Asset Pipeline
+- [ ] Complete TMD → glTF exporter
+- [ ] VAG → WAV/OGG converter with ADPCM decode
+- [ ] Batch asset extraction from disc
+- [ ] Asset metadata and organization
+- [ ] Test assets loading in Bevy
 
-### Phase 3: Battle System
-- [ ] Battle initialization
-- [ ] Turn-based combat
-- [ ] Art system (combo input)
-- [ ] Damage calculation
-- [ ] Enemy AI
-- [ ] Battle animations
+### Phase 3: Game Logic (Battle System Priority)
+- [ ] Decompile battle damage formulas
+- [ ] Decompile Art/combo system mechanics
+- [ ] Decompile enemy AI logic
+- [ ] Implement battle system in Bevy
+- [ ] Character stats and progression
 
-### Phase 4: Content
+### Phase 4: World Systems
+- [ ] Field movement and collision
+- [ ] Event script interpreter
 - [ ] Menu system
-- [ ] Event/scripting system
 - [ ] Save/load system
-- [ ] Complete asset integration
-- [ ] Full game playthrough
+- [ ] Map connectivity
 
-### Phase 5: Polish
-- [ ] Bug fixes
+### Phase 5: Content Integration
+- [ ] Import all extracted assets
+- [ ] Implement all battle mechanics
+- [ ] Complete story event scripts
+- [ ] Full game playthrough possible
+
+### Phase 6: Polish
+- [ ] Bug fixes and testing
 - [ ] Performance optimization
-- [ ] Modern enhancements (optional)
-- [ ] Testing and validation
+- [ ] Modern enhancements (optional: widescreen, HD, QoL)
+- [ ] Release builds
 
 ## 🤝 Contributing
 

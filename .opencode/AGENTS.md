@@ -454,6 +454,105 @@ If you accidentally add decompilation references to Rust code:
 
 ---
 
+## 🎮 Decompilation Priorities (Modern Approach)
+
+### ⭐ HIGH PRIORITY - Analyze These First
+
+These systems contain **game logic** that we need to understand for the modern rewrite:
+
+#### 1. **Battle System Logic** (HIGHEST PRIORITY)
+- ✅ **Analyze:** Damage formulas, stat calculations, AI behavior
+- ✅ **Analyze:** Art/combo system mechanics and timing
+- ✅ **Analyze:** Status effect calculations and durations
+- ✅ **Analyze:** Enemy AI decision trees
+- ✅ **Analyze:** Experience/leveling formulas
+- ❌ **Skip:** Battle rendering, sprite animation, GPU commands
+
+#### 2. **Character Stats & Progression**
+- ✅ **Analyze:** Stat growth formulas per level
+- ✅ **Analyze:** Equipment stat modifiers
+- ✅ **Analyze:** Ra-Seru absorption mechanics
+- ✅ **Analyze:** Seru skill unlock conditions
+- ❌ **Skip:** Character model rendering
+
+#### 3. **Item & Equipment System**
+- ✅ **Analyze:** Item effects (battle and field)
+- ✅ **Analyze:** Equipment stat bonuses
+- ✅ **Analyze:** Synthesis recipes (if present)
+- ✅ **Analyze:** Shop prices and availability
+- ❌ **Skip:** Menu rendering, icon loading
+
+#### 4. **Enemy Data Tables**
+- ✅ **Analyze:** Enemy stats (HP, MP, ATK, DEF, etc.)
+- ✅ **Analyze:** Enemy drops and rewards
+- ✅ **Analyze:** Enemy abilities and AI patterns
+- ✅ **Analyze:** Boss mechanics and phases
+- ❌ **Skip:** Enemy model/texture loading
+
+#### 5. **Event Scripts & Story Flow**
+- ✅ **Analyze:** Event flag conditions
+- ✅ **Analyze:** Story progression triggers
+- ✅ **Analyze:** NPC dialogue trees
+- ✅ **Analyze:** Quest completion conditions
+- ❌ **Skip:** Cutscene video playback
+
+#### 6. **Field/World Logic**
+- ✅ **Analyze:** Map connectivity (which areas connect)
+- ✅ **Analyze:** Random encounter rates and tables
+- ✅ **Analyze:** Treasure chest contents and flags
+- ✅ **Analyze:** Door unlock conditions
+- ❌ **Skip:** Map rendering, collision mesh loading
+
+#### 7. **Save Data Format**
+- ✅ **Analyze:** Save data structure and fields
+- ✅ **Analyze:** Flag storage layout
+- ✅ **Analyze:** Inventory serialization
+- ❌ **Skip:** Memory card block management
+
+### ❌ LOW PRIORITY - Skip Unless Necessary
+
+These are **hardware abstraction layers** that we replace with Bevy:
+
+#### PSX Hardware Functions (Skip These)
+- ❌ GPU initialization (GPU_Init, SetDrawArea, SetDrawMode, etc.)
+- ❌ GPU primitive functions (DrawPoly, DrawLine, DrawSprite, etc.)
+- ❌ SPU/audio hardware (SpuInit, SpuSetVoice, SsUtSetReverbType, etc.)
+- ❌ CD-ROM functions (CdInit, CdRead, CdControl, CdSync, etc.)
+- ❌ Memory card (InitCARD, StartCARD, ReadCARD, WriteCARD, etc.)
+- ❌ DMA operations (DMA setup, transfer, completion polling)
+- ❌ GTE macro functions (matrix math - use Bevy's math instead)
+- ❌ BIOS calls (FlushCache, EnterCriticalSection, etc.)
+- ❌ Controller polling (InitPAD, StartPAD, etc.)
+- ❌ VSync/timing functions (VSync, VSyncCallback, etc.)
+
+#### Rendering/Presentation Functions (Skip These)
+- ❌ Display list builders
+- ❌ Primitive ordering tables (OT)
+- ❌ Texture upload/management
+- ❌ Sprite sheet packers
+- ❌ Font rendering primitives
+- ❌ 2D/3D coordinate transformations (use Bevy transforms)
+
+### 🔍 How to Identify What to Skip
+
+When analyzing a function in Ghidra, **SKIP IT** if:
+- It accesses hardware registers (0x1F8xxxxx addresses)
+- It calls BIOS functions (A0/B0/C0 table calls)
+- It manipulates GPU command buffers
+- It only performs coordinate transformations
+- Its name suggests hardware ("Spu", "Gpu", "Cd", "Pad", "Gte", "Dma")
+- It's purely about rendering (no game state changes)
+
+When analyzing a function, **ANALYZE IT** if:
+- It modifies player/enemy stats
+- It calculates damage or effects
+- It checks/sets game flags
+- It contains formulas or lookup tables
+- It implements AI or decision logic
+- It defines item/enemy/ability data
+
+---
+
 ## 🎮 Game System Architecture
 
 ### Major Systems (To Be Mapped)
@@ -464,31 +563,27 @@ If you accidentally add decompilation references to Rust code:
 - [ ] System initialization
 - [ ] BIOS/library setup
 
-#### 2. **Graphics/Rendering System**
-- [ ] GPU command submission
-- [ ] Display list management
-- [ ] Texture management (TIM format)
-- [ ] 3D model rendering
-- [ ] 2D sprite rendering
-- [ ] Animation system
-- [ ] Camera system
-- [ ] Lighting calculations
-- **GTE Functions** (0x20000000-0x20000263):
-  - Matrix operations
-  - Vertex transformations
-  - Perspective projection
-  - Color interpolation
+#### 2. **Graphics/Rendering System** ⚠️ (LOW PRIORITY - Replace with Bevy)
+- [ ] ~~GPU command submission~~ (Skip)
+- [ ] ~~Display list management~~ (Skip)
+- [ ] ~~Texture management (TIM format)~~ (Extract assets only)
+- [ ] ~~3D model rendering~~ (Skip)
+- [ ] ~~2D sprite rendering~~ (Skip)
+- [ ] Animation system (timing data only)
+- [ ] Camera system (parameters only)
+- [ ] ~~Lighting calculations~~ (Skip)
+- **GTE Functions** (0x20000000-0x20000263): ⚠️ SKIP - Use Bevy math
 
-#### 3. **Field/World System**
-- [ ] Character controller
-- [ ] Collision detection
-- [ ] Map loading
-- [ ] NPC management
-- [ ] Event triggers
-- [ ] World map navigation
-- [ ] Door/transition handling
+#### 3. **Field/World System** ⭐ (HIGH PRIORITY)
+- [x] Character controller (logic only, not rendering)
+- [x] Collision detection (logic only)
+- [x] Map loading (connectivity data)
+- [x] NPC management (dialogue, events)
+- [x] Event triggers (conditions and actions)
+- [x] World map navigation (transitions)
+- [x] Door/transition handling (unlock conditions)
 
-#### 4. **Battle System** ⭐ (Most Complex)
+#### 4. **Battle System** ⭐⭐⭐ (HIGHEST PRIORITY - Most Complex)
 - [ ] Battle initialization
 - [ ] Turn management
 - [ ] **Art System** (unique combo input system)
@@ -503,46 +598,47 @@ If you accidentally add decompilation references to Rust code:
 - [ ] Victory/defeat handling
 - [ ] Experience/level up
 
-#### 5. **Menu System**
-- [ ] Main menu
-- [ ] Pause menu
-- [ ] Equipment menu
-- [ ] Item menu
-- [ ] Magic/Arts menu
-- [ ] Status screens
-- [ ] Save/Load interface
+#### 5. **Menu System** ⚠️ (MEDIUM PRIORITY - Logic Only)
+- [x] Main menu (navigation flow)
+- [x] Pause menu (navigation flow)
+- [x] Equipment menu (stat calculations)
+- [x] Item menu (item effects)
+- [x] Magic/Arts menu (ability data)
+- [x] Status screens (stat display logic)
+- [x] Save/Load interface (data format only)
+- [ ] ~~Menu rendering~~ (Skip - use Bevy UI)
 
-#### 6. **Audio System**
-- [ ] SPU (Sound Processing Unit) management
-- [ ] VAB (Voice Attribute Bank) loading
-- [ ] VAG (audio) playback
-- [ ] Music sequencing
-- [ ] Sound effect triggers
+#### 6. **Audio System** ⚠️ (LOW PRIORITY - Extract Assets Only)
+- [ ] ~~SPU (Sound Processing Unit) management~~ (Skip)
+- [ ] ~~VAB (Voice Attribute Bank) loading~~ (Extract assets only)
+- [ ] ~~VAG (audio) playback~~ (Skip - use Bevy audio)
+- [ ] ~~Music sequencing~~ (Skip)
+- [x] Sound effect triggers (which sounds to play when)
 
-#### 7. **Save/Load System**
-- [ ] Memory card operations
-- [ ] Save data format
-- [ ] Game state serialization
-- [ ] Slot management
+#### 7. **Save/Load System** ⭐ (HIGH PRIORITY)
+- [ ] ~~Memory card operations~~ (Skip - use native save system)
+- [x] Save data format (structure and fields)
+- [x] Game state serialization (what to save)
+- [ ] ~~Slot management~~ (Skip)
 
-#### 8. **Input System**
-- [ ] Controller reading
-- [ ] Button mapping
-- [ ] Input buffering
-- [ ] Menu navigation
+#### 8. **Input System** ⚠️ (LOW PRIORITY - Use Bevy Input)
+- [ ] ~~Controller reading~~ (Skip - use Bevy input)
+- [x] Button mapping (which actions map to which buttons)
+- [x] Input buffering (for combo system)
+- [x] Menu navigation (button logic)
 
-#### 9. **Asset Management**
-- [ ] CD-ROM file loading
-- [ ] Asset decompression
-- [ ] Memory management
-- [ ] Texture caching
+#### 9. **Asset Management** ⚠️ (LOW PRIORITY - Extract Only)
+- [ ] ~~CD-ROM file loading~~ (Skip)
+- [ ] ~~Asset decompression~~ (Decompress offline, save as native)
+- [ ] ~~Memory management~~ (Skip)
+- [ ] ~~Texture caching~~ (Skip - Bevy handles this)
 
-#### 10. **Event/Scripting System**
-- [ ] Event script interpreter
-- [ ] Flag management
-- [ ] Dialogue system
-- [ ] Cutscene playback
-- [ ] Quest tracking
+#### 10. **Event/Scripting System** ⭐⭐ (VERY HIGH PRIORITY)
+- [x] Event script interpreter (bytecode format and opcodes)
+- [x] Flag management (which flags control what)
+- [x] Dialogue system (text display, choices, conditions)
+- [ ] ~~Cutscene playback~~ (Skip rendering, extract timing data)
+- [x] Quest tracking (completion conditions)
 
 ---
 

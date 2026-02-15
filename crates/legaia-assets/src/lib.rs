@@ -7,10 +7,12 @@
 //! - Organizing assets for the game engine
 
 pub mod converter;
+pub mod extraction;
 pub mod extractor;
 pub mod formats;
 pub mod manifest;
 
+pub use extraction::{AssetExtractionService, ExtractionProgress, ExtractionStats};
 pub use extractor::AssetExtractor;
 pub use manifest::{AssetEntry, AssetManifest};
 

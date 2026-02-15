@@ -4,7 +4,9 @@
 //! when the user first launches the game.
 
 use bevy::prelude::*;
+use legaia_assets::{AssetExtractionService, ExtractionProgress as ExtProgress, ExtractionStats};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
 
 /// Setup state for first-run extraction
@@ -24,18 +26,27 @@ pub enum SetupState {
 }
 
 /// Resource tracking setup progress
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct SetupProgress {
     /// Path to PSX disc image
     pub disc_path: Option<PathBuf>,
-    /// Current extraction step
-    pub current_step: String,
-    /// Progress (0.0 - 1.0)
-    pub progress: f32,
-    /// Total files to extract
-    pub total_files: usize,
-    /// Files extracted so far
-    pub extracted_files: usize,
+    /// Current extraction progress (shared with background thread)
+    pub extraction_progress: Arc<Mutex<Option<ExtProgress>>>,
+    /// Extraction stats (when complete)
+    pub stats: Option<ExtractionStats>,
+    /// Error message if extraction failed
+    pub error: Option<String>,
+}
+
+impl Default for SetupProgress {
+    fn default() -> Self {
+        Self {
+            disc_path: None,
+            extraction_progress: Arc::new(Mutex::new(None)),
+            stats: None,
+            error: None,
+        }
+    }
 }
 
 /// Configuration file tracking setup completion
@@ -126,9 +137,10 @@ impl Plugin for SetupPlugin {
                 prompt_disc_path.run_if(in_state(SetupState::PromptDiscPath)),
             )
             .add_systems(OnEnter(SetupState::ValidateDisc), validate_disc)
+            .add_systems(OnEnter(SetupState::Extracting), start_extraction)
             .add_systems(
                 Update,
-                extract_assets.run_if(in_state(SetupState::Extracting)),
+                monitor_extraction.run_if(in_state(SetupState::Extracting)),
             )
             .add_systems(OnEnter(SetupState::Complete), finish_setup);
     }
@@ -197,18 +209,79 @@ fn validate_disc(progress: Res<SetupProgress>, mut next_state: ResMut<NextState<
 }
 
 /// Extract assets from disc
-fn extract_assets(
+fn start_extraction(progress: Res<SetupProgress>) {
+    let disc_path = match &progress.disc_path {
+        Some(path) => path.clone(),
+        None => {
+            error!("No disc path set!");
+            return;
+        }
+    };
+
+    let output_dir = SetupConfig::assets_dir();
+    let progress_arc = Arc::clone(&progress.extraction_progress);
+
+    info!("Starting asset extraction from: {}", disc_path.display());
+    info!("Output directory: {}", output_dir.display());
+
+    // Spawn extraction on background thread
+    std::thread::spawn(move || {
+        let service = AssetExtractionService::new(disc_path, output_dir).with_progress_callback(
+            Arc::new(move |ext_progress| {
+                // Update shared progress
+                if let Ok(mut progress) = progress_arc.lock() {
+                    *progress = Some(ext_progress);
+                }
+            }),
+        );
+
+        match service.extract_all() {
+            Ok(stats) => {
+                info!(
+                    "Extraction complete! {}/{} files extracted, {} converted",
+                    stats.extracted_files, stats.total_files, stats.converted_files
+                );
+                // Progress callback will have stats via last update
+            }
+            Err(e) => {
+                error!("Extraction failed: {}", e);
+                // TODO: Store error in progress for UI to display
+            }
+        }
+    });
+}
+
+/// Monitor extraction progress and transition when complete
+fn monitor_extraction(
     mut progress: ResMut<SetupProgress>,
     mut next_state: ResMut<NextState<SetupState>>,
 ) {
-    // TODO: Implement actual extraction
-    // For now, just simulate progress
+    // Check if extraction is complete
+    let should_complete = if let Ok(ext_progress) = progress.extraction_progress.lock() {
+        if let Some(ref p) = *ext_progress {
+            // Check if we're done (processed == total and step is "Complete!")
+            if p.step == "Complete!" && p.processed_files == p.total_files {
+                Some(ExtractionStats {
+                    total_files: p.total_files,
+                    extracted_files: p.processed_files,
+                    converted_files: p.converted_files,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
-    progress.progress += 0.01;
-    progress.current_step = format!("Extracting assets... {:.0}%", progress.progress * 100.0);
-
-    if progress.progress >= 1.0 {
+    // Update state after releasing lock
+    if let Some(stats) = should_complete {
         info!("Asset extraction complete!");
+
+        // Store final stats
+        progress.stats = Some(stats);
 
         // Save config
         let config = SetupConfig {

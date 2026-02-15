@@ -18,7 +18,7 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
     // For now, export only vertices as a simple point cloud
     // Full primitive export would require implementing the primitive parser in TMD
 
-    for (obj_idx, object) in tmd.objects.iter().enumerate() {
+    for (_obj_idx, object) in tmd.objects.iter().enumerate() {
         // Skip empty objects
         if object.vertices.is_empty() {
             continue;
@@ -71,7 +71,7 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             byte_stride: Some(json::buffer::Stride(12)), // 3 floats * 4 bytes
             extensions: None,
             extras: Default::default(),
-            name: Some(format!("positions_object_{}", obj_idx)),
+            name: Some(format!("positions_view_{}", _obj_idx)),
             target: Some(json::validation::Checked::Valid(
                 json::buffer::Target::ArrayBuffer,
             )),
@@ -91,7 +91,7 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             type_: json::validation::Checked::Valid(json::accessor::Type::Vec3),
             min: Some(json::Value::from(vec![min[0], min[1], min[2]])),
             max: Some(json::Value::from(vec![max[0], max[1], max[2]])),
-            name: Some(format!("positions_accessor_{}", obj_idx)),
+            name: Some(format!("positions_accessor_{}", _obj_idx)),
             normalized: false,
             sparse: None,
         });
@@ -118,7 +118,7 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
         meshes.push(json::Mesh {
             extensions: None,
             extras: Default::default(),
-            name: Some(format!("mesh_{}", obj_idx)),
+            name: Some(format!("mesh_{}", _obj_idx)),
             primitives: vec![primitive],
             weights: None,
         });
@@ -160,11 +160,12 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
     root.accessors = accessors;
     root.buffers = buffers
         .iter()
-        .map(|b| json::Buffer {
+        .enumerate()
+        .map(|(i, b)| json::Buffer {
             byte_length: USize64::from(b.len()),
             extensions: None,
             extras: Default::default(),
-            name: None,
+            name: Some(format!("buffer_{}", i)),
             uri: Some(format!(
                 "{}.bin",
                 output_path.file_stem().unwrap().to_string_lossy()

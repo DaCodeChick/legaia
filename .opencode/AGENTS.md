@@ -346,6 +346,284 @@ If you accidentally add decompilation references to Rust code:
 
 ---
 
+## RDSS Methodology: Refactor, Despaghettify, Simplify, Split
+
+**Core Principle**: Keep modules focused, readable, and maintainable by preventing code bloat and complexity.
+
+### 🚨 MANDATORY ENFORCEMENT 🚨
+
+**When to Apply RDSS:**
+- ✅ Any file exceeding **500 lines** of code
+- ✅ Any function exceeding **100 lines** of code
+- ✅ Any module with more than **10 public items** (structs/functions/traits)
+- ✅ Code with nested complexity >4 levels deep (if/for/match nesting)
+- ✅ When adding a feature that doesn't fit the module's core purpose
+- ✅ When you find yourself scrolling excessively to understand code flow
+- ✅ Before marking any module as "production-ready"
+
+### The Four Steps of RDSS
+
+#### 1. **Refactor** - Improve Structure
+- Extract repeated code into helper functions
+- Replace magic numbers with named constants
+- Use descriptive variable names
+- Apply design patterns where appropriate
+- Consolidate duplicate logic
+
+#### 2. **Despaghettify** - Untangle Dependencies
+- Break circular dependencies
+- Reduce coupling between modules
+- Use clear interfaces and abstractions
+- Minimize global state access
+- Make data flow explicit and unidirectional
+
+#### 3. **Simplify** - Reduce Complexity
+- Remove unnecessary abstractions
+- Replace complex conditionals with early returns
+- Use Result/Option instead of sentinel values
+- Eliminate dead code and unused features
+- Choose clarity over cleverness
+
+#### 4. **Split** - Divide Responsibilities
+- One struct/module = one clear purpose
+- Split large files by functionality
+- Create submodules for related features
+- Extract testable units
+- Organize by domain, not by code type
+
+### 📏 Size Guidelines
+
+**File Size Limits:**
+- Target: **< 300 lines** per file
+- Acceptable: **300-500 lines** (must have clear sections)
+- Warning: **500-800 lines** (plan refactoring)
+- Critical: **> 800 lines** (MUST split immediately)
+
+**Function Size Limits:**
+- Target: **< 30 lines** per function
+- Acceptable: **30-50 lines** (single clear purpose)
+- Warning: **50-100 lines** (consider extracting helpers)
+- Critical: **> 100 lines** (MUST refactor immediately)
+
+**Module Complexity Limits:**
+- Target: **< 5 public items** (structs/functions/traits)
+- Acceptable: **5-10 public items** (cohesive API)
+- Warning: **10-15 public items** (consider splitting)
+- Critical: **> 15 public items** (MUST reorganize immediately)
+
+### 🔧 Splitting Strategies
+
+#### Strategy 1: Split by Feature Domain
+```
+# Before: formats/mod.rs (2000 lines)
+formats/mod.rs
+
+# After: Split by format type
+formats/
+  mod.rs         (50 lines - re-exports)
+  tim.rs         (400 lines - TIM textures)
+  tmd.rs         (350 lines - TMD models)
+  vag.rs         (300 lines - VAG audio)
+  xa.rs          (320 lines - XA format)
+  xa_adpcm.rs    (335 lines - XA decoder)
+```
+
+#### Strategy 2: Split by Responsibility
+```
+# Before: cdrom/mod.rs (1500 lines - reads, caches, parsing)
+cdrom/mod.rs
+
+# After: Split by concern
+cdrom/
+  mod.rs         (100 lines - public API)
+  reader.rs      (300 lines - low-level sector reading)
+  cache.rs       (250 lines - caching layer)
+  iso9660.rs     (400 lines - filesystem parsing)
+  xa_sector.rs   (200 lines - XA sector handling)
+```
+
+#### Strategy 3: Split by Abstraction Level
+```
+# Before: battle/mod.rs (2500 lines - UI, logic, AI, damage)
+battle/mod.rs
+
+# After: Split by abstraction
+battle/
+  mod.rs         (100 lines - battle system coordinator)
+  state.rs       (200 lines - battle state machine)
+  actions.rs     (300 lines - attack/defend/item actions)
+  damage.rs      (250 lines - damage calculation formulas)
+  ai.rs          (400 lines - enemy AI behavior)
+  ui/
+    mod.rs       (100 lines - UI coordinator)
+    menu.rs      (300 lines - battle menu rendering)
+    animations.rs (250 lines - battle animations)
+```
+
+### 🚫 Common RDSS Violations
+
+#### Violation 1: God Module
+```rust
+// ❌ WRONG: One module does everything
+// formats/mod.rs (2500 lines)
+pub mod formats {
+    pub struct TIM { ... }
+    pub struct TMD { ... }
+    pub struct VAG { ... }
+    pub struct XA { ... }
+    pub struct XaAdpcm { ... }
+    // 50+ functions mixed together
+}
+```
+
+```rust
+// ✅ CORRECT: Split by format type
+pub mod formats {
+    pub mod tim;
+    pub mod tmd;
+    pub mod vag;
+    pub mod xa;
+    pub mod xa_adpcm;
+}
+```
+
+#### Violation 2: Function Does Too Much
+```rust
+// ❌ WRONG: 300-line function doing parsing, validation, conversion
+fn extract_and_process_asset(data: &[u8]) -> Result<ProcessedAsset> {
+    // 50 lines: Parse header
+    // 50 lines: Validate format
+    // 50 lines: Extract sub-assets
+    // 50 lines: Convert formats
+    // 50 lines: Apply transformations
+    // 50 lines: Generate output
+}
+```
+
+```rust
+// ✅ CORRECT: Extract helper functions
+fn extract_and_process_asset(data: &[u8]) -> Result<ProcessedAsset> {
+    let header = parse_header(data)?;
+    validate_format(&header)?;
+    let assets = extract_sub_assets(data, &header)?;
+    let converted = convert_formats(assets)?;
+    apply_transformations(converted)
+}
+```
+
+#### Violation 3: Deep Nesting
+```rust
+// ❌ WRONG: 6 levels of nesting
+fn process_battle_action(action: Action) {
+    if action.is_valid() {
+        if let Some(target) = action.target() {
+            if target.is_alive() {
+                match action.action_type {
+                    ActionType::Attack => {
+                        if let Some(weapon) = action.weapon {
+                            // Finally do something...
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+```rust
+// ✅ CORRECT: Early returns, flat structure
+fn process_battle_action(action: Action) -> Result<()> {
+    if !action.is_valid() {
+        return Err(Error::InvalidAction);
+    }
+    
+    let target = action.target().ok_or(Error::NoTarget)?;
+    if !target.is_alive() {
+        return Err(Error::TargetDead);
+    }
+    
+    match action.action_type {
+        ActionType::Attack => process_attack(action, target),
+        // ...
+    }
+}
+```
+
+### 📋 RDSS Checklist
+
+Before committing any module, verify:
+
+- [ ] **File size** < 500 lines (or has clear plan to split)
+- [ ] **Function size** < 100 lines (all functions)
+- [ ] **Nesting depth** < 4 levels (except rare cases)
+- [ ] **Public API** < 10 items (or logically grouped)
+- [ ] **Single responsibility** - module has one clear purpose
+- [ ] **No code duplication** - extract common logic
+- [ ] **Clear naming** - no abbreviations or cryptic names
+- [ ] **Documentation** - all public items documented
+- [ ] **Tests** - critical paths covered
+- [ ] **No TODO/FIXME** - resolve or create issues
+
+### 🎯 When NOT to Split
+
+Don't split prematurely:
+- ❌ Files under 300 lines with cohesive purpose
+- ❌ Splitting would create artificial boundaries
+- ❌ Code is still in rapid prototyping phase
+- ❌ Splitting would hurt readability more than help
+- ❌ Module has natural unity (e.g., parsing single format)
+
+**Good judgment required**: RDSS is about maintainability, not arbitrary line counts.
+
+### 🏆 RDSS Success Examples
+
+#### Example 1: XA Audio (Good - No Split Needed)
+- `xa.rs`: 384 lines (format parsing, clear sections)
+- `xa_adpcm.rs`: 312 lines (decoder implementation)
+- **Decision**: Keep separate - different concerns, manageable size
+
+#### Example 2: PROT.DAT Archive (Future Split Candidate)
+- Current: `scanner.rs`: 247 lines
+- If it grows beyond 500 lines with TIM/TMD/VAG parsing:
+  - Split to: `scanner/mod.rs`, `scanner/tim.rs`, `scanner/tmd.rs`, etc.
+
+#### Example 3: CD-ROM Reader (Good Split)
+- Instead of single 1000+ line file:
+  - `cdrom/mod.rs`: Public API (100 lines)
+  - `cdrom/reader.rs`: Low-level reading (300 lines)
+  - `cdrom/iso9660.rs`: Filesystem parsing (400 lines)
+
+### 📝 Documentation Requirements
+
+When splitting modules, update:
+1. **Module-level docs** - Explain purpose and organization
+2. **README.md** - Update architecture documentation
+3. **AGENTS.md** - Record major refactorings here
+4. **Commit message** - Explain why split was necessary
+
+### Enforcement
+
+**This policy applies to:**
+- ✅ All production code (`crates/*/src/**/*.rs`)
+- ✅ All examples (`crates/*/examples/*.rs`)
+- ✅ Build scripts and tooling
+- ✅ Test code (though tests can be longer)
+
+**Before ANY commit:**
+1. Check file sizes: `wc -l $(find crates -name "*.rs")`
+2. Identify files > 500 lines
+3. Review functions > 100 lines: `rg "^fn " -A 100 | grep "^fn"`
+4. Apply RDSS if needed or document plan
+5. Mark technical debt in comments if deferring
+
+**Recent RDSS Applied (2026-02-15):**
+- ✅ XA audio: Split `xa.rs` (format) from `xa_adpcm.rs` (decoder)
+- ✅ Each kept under 400 lines with clear boundaries
+- ✅ No "god modules" - focused responsibilities
+
+---
+
 ## 📋 Naming Conventions
 
 ### Functions

@@ -1,4 +1,72 @@
-# Legend of Legaia Decompilation Directives
+# Legend of Legaia Rewrite Project
+
+## 🎮 PROJECT STRATEGY (Updated 2026-02-14)
+
+**We are building a MODERN Bevy-native game, NOT a PSX emulation layer.**
+
+### Core Philosophy
+
+This is a **clean-room rewrite** using modern Bevy ECS patterns. We use decompilation to understand GAME LOGIC (battle formulas, AI behavior, story events), not to recreate PSX hardware behavior.
+
+### What We Build
+
+✅ **Modern Bevy Systems:**
+- Native Bevy rendering (no GPU register emulation)
+- Native Bevy audio with `bevy_kira_audio` (no SPU emulation)
+- Modern input with `bevy_input` (no controller memory card polling)
+- ECS-based game state (no function pointer tables)
+- Asset-driven design (extracted and converted from PSX formats)
+
+❌ **What We DON'T Build:**
+- PSX GPU primitive registers (GP0/GP1 commands)
+- SPU channel state emulation
+- CD-ROM XA/ADPCM streaming emulation
+- Memory card block management
+- DMA transfer simulation
+- BIOS/kernel function wrappers
+
+### Decompilation Usage
+
+**Use Ghidra to extract:**
+- ✅ Battle damage formulas
+- ✅ Character stat calculations
+- ✅ Enemy AI behavior logic
+- ✅ Story event flags and triggers
+- ✅ Menu navigation flow
+- ✅ Item effects and abilities
+- ✅ Map connectivity and transitions
+- ✅ Save data structure
+
+**Skip in Ghidra:**
+- ❌ GPU initialization functions (GPU_Init, SetDrawArea, etc.)
+- ❌ SPU/audio hardware functions (SpuInit, SsUtSetReverbType, etc.)
+- ❌ CD-ROM functions (CdInit, CdRead, CdControl, etc.)
+- ❌ Memory card functions (InitCARD, StartCARD, etc.)
+- ❌ Low-level BIOS calls (FlushCache, EnterCriticalSection, etc.)
+- ❌ DMA/interrupt handlers
+
+### Asset Extraction Workflow
+
+1. **Extract from PSX disc image** (`.bin/.cue` files)
+2. **Convert to modern formats:**
+   - TIM textures → PNG/JPEG (use `psxutils` crate)
+   - TMD models → glTF/FBX (use `psxutils` crate)
+   - VAG audio → WAV/OGG (use `psxutils` crate)
+   - XA streams → OGG Vorbis
+   - STR videos → MP4/WebM
+3. **Import to Bevy:**
+   - Load as Bevy `Handle<Image>`, `Handle<Mesh>`, `Handle<AudioSource>`
+   - Use Bevy's asset loading system
+   - Organize in `assets/` directory with metadata
+
+### Development Priorities
+
+1. **Asset extraction tooling** (using `psxutils` crate)
+2. **Game logic implementation** (battle, field, menu from decompilation insights)
+3. **Modern UX/polish** (proper resolution, widescreen, quality-of-life improvements)
+4. **Content accuracy** (match game behavior, not hardware behavior)
+
+---
 
 ## DICK Methodology: Decompile It Correctly, Knucklehead
 

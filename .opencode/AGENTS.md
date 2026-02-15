@@ -59,12 +59,82 @@ This is a **clean-room rewrite** using modern Bevy ECS patterns. We use decompil
    - Use Bevy's asset loading system
    - Organize in `assets/` directory with metadata
 
+### Modding Philosophy (2026-02-15)
+
+**IMPORTANT: This game is designed to be moddable.**
+
+When implementing game logic, prefer **data-driven and scriptable** approaches over hardcoding:
+
+#### ✅ Make These Moddable via Scripts/Data Files:
+- **Enemy AI behavior** - Use Lua/Rhai scripts or behavior trees in JSON/RON
+- **Battle formulas** - Damage, stat calculations, status effects (scriptable)
+- **Item effects** - Define in data files (JSON/RON/TOML)
+- **Character stats & progression** - Level-up formulas, stat growth curves
+- **Ability definitions** - Arts, magic, Ra-Seru abilities
+- **Enemy stats & drops** - HP, ATK, DEF, rewards, etc.
+- **Shop inventories** - What items are available where
+- **Event triggers** - Story flags, map transitions, NPC dialogue
+- **Quest logic** - Completion conditions, rewards
+
+#### 🎯 Scripting Strategy:
+1. **Extract logic from decompilation** - Understand the original behavior
+2. **Design data format** - JSON/RON/TOML for simple data, Lua/Rhai for complex logic
+3. **Implement script interpreter** - Use `mlua` (Lua) or `rhai` (Rust-native scripting)
+4. **Create modding API** - Document functions/events modders can hook into
+5. **Hot reload support** - Allow script changes without restart (dev mode)
+
+#### 📁 Proposed Mod Structure:
+```
+assets/
+  mods/
+    core/                 # Base game content (extracted from PSX)
+      enemies/
+        slime.ron         # Enemy stats, AI script reference
+      items/
+        healing_leaf.ron  # Item definition
+      scripts/
+        ai/
+          slime.lua       # Enemy AI behavior script
+        formulas/
+          damage.lua      # Battle damage calculation
+    my_custom_mod/        # User mod (overrides core)
+      enemies/
+        slime.ron         # Modified slime stats
+      scripts/
+        ai/
+          slime.lua       # Custom AI behavior
+```
+
+#### 🔧 Implementation Notes:
+- **Rust code**: Provides the engine, ECS systems, rendering, physics
+- **Data files**: Define content (stats, items, enemies)
+- **Scripts**: Implement behavior logic (AI, formulas, events)
+- **Mod loading priority**: User mods override core content
+
+#### Example - Enemy AI:
+```lua
+-- assets/mods/core/scripts/ai/slime_basic.lua
+function on_turn_start(enemy, battle)
+    local player_hp_percent = battle:get_target_hp_percent(enemy.target)
+    
+    if player_hp_percent < 0.3 then
+        -- Target weak player
+        return battle:use_ability("tackle", battle:find_weakest_target())
+    else
+        -- Random attack
+        return battle:use_ability("tackle", battle:get_random_target())
+    end
+end
+```
+
 ### Development Priorities
 
 1. **Asset extraction tooling** (using `psxutils` crate)
 2. **Game logic implementation** (battle, field, menu from decompilation insights)
-3. **Modern UX/polish** (proper resolution, widescreen, quality-of-life improvements)
-4. **Content accuracy** (match game behavior, not hardware behavior)
+3. **Modding infrastructure** (script interpreter, data-driven systems, hot reload)
+4. **Modern UX/polish** (proper resolution, widescreen, quality-of-life improvements)
+5. **Content accuracy** (match game behavior, not hardware behavior)
+6. **Modding documentation** (API docs, tutorials, example mods)
 
 ---
 
@@ -84,6 +154,56 @@ If you touch a function in Ghidra, you are REQUIRED to rename:
 - ✅ ALL called functions that are unnamed (queue them for next analysis)
 
 **ANY unnamed symbol = INCOMPLETE WORK = UNACCEPTABLE**
+
+### Modding-Focused Analysis (2026-02-15)
+
+When analyzing game logic functions (AI, formulas, events), document them with **modding in mind**:
+
+#### During Decompilation:
+1. **Extract the algorithm** - Understand what the code does
+2. **Identify moddable parameters** - What values should be data-driven?
+3. **Document for script conversion** - Note the logic flow for script implementation
+4. **List dependencies** - What game state/functions does this need access to?
+
+#### Example - Enemy AI Function:
+```c
+/* Enemy AI: Slime basic behavior
+   
+   MODDING NOTE: This should be converted to a Lua script.
+   
+   Scriptable parameters:
+   - Damage threshold for behavior change (currently 30% HP)
+   - Ability choices ("tackle", "bite")
+   - Target selection logic
+   
+   Required API access:
+   - battle:get_target_hp_percent(target)
+   - battle:use_ability(name, target)
+   - battle:find_weakest_target()
+   - battle:get_random_target()
+   
+   Original logic:
+   - If target below 30% HP, focus on weakest player
+   - Otherwise, random attack
+*/
+void slime_ai_basic(EnemyState* enemy, BattleState* battle) {
+    float target_hp_percent = get_target_hp_percent(enemy->target);
+    
+    if (target_hp_percent < 0.30f) {  // 30% threshold - should be moddable
+        use_ability("tackle", find_weakest_target(battle));
+    } else {
+        use_ability("tackle", get_random_target(battle));
+    }
+}
+```
+
+#### Categories to Mark as "Convert to Script":
+- ✅ Enemy AI decision trees → Lua scripts
+- ✅ Damage formulas → Lua functions or data files
+- ✅ Item effects → RON/JSON definitions with script hooks
+- ✅ Event triggers → Lua scripts with callbacks
+- ✅ Stat calculations → Scriptable formulas
+- ✅ Quest logic → Event scripts
 
 ### Partial Analysis Exception
 

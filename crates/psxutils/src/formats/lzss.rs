@@ -296,7 +296,7 @@ mod tests {
         let result = decompress(&data).unwrap();
         assert_eq!(result, b"Hello PS");
     }
-}
+
     #[test]
     fn test_config_standard() {
         let config = LzssConfig::standard();

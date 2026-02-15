@@ -1,5 +1,21 @@
 # Legend of Legaia Rewrite Project
 
+## 🎉 BREAKTHROUGH: Entity Callback System Discovered (2026-02-15)
+
+**We found how combat logic executes!** The battle system uses an entity-component architecture with function pointer callbacks:
+
+- **`update_entity_list_logic` @ 0x8002519c** dispatches entity callbacks every frame
+- **Entity structure** has `update_func` pointer at offset +0xc that gets called per-frame
+- **Entity type descriptors** @ 0x8007062c contain callback function pointers
+- **CRITICAL**: Combat AI is in **dynamically loaded overlays** (RAM @ 0x801d-0x801f)
+  - Static callbacks (CODE segment) handle rendering/effects
+  - Dynamic callbacks (RAM) contain player/enemy combat AI, damage formulas, turn management
+- **Next step**: Extract battle overlays from PROT.DAT to find actual combat logic!
+
+**Documentation**: See `docs/decompilation/entity-structure.md` and `docs/decompilation/sessions/2026-02-15-entity-callback-system-discovered.md`
+
+---
+
 ## 🎮 PROJECT STRATEGY (Updated 2026-02-14)
 
 **We are building a MODERN Bevy-native game, NOT a PSX emulation layer.**
@@ -1166,7 +1182,7 @@ Total: 12 handlers | Status: 12 Complete (100% coverage)
 | 0x800565d8 | state_handler_11_battle_handler | **✅ Complete** | Battle | Battle system entry point. Session 2026-02-15. |
 
 #### Battle System Functions (0x80052770-0x80055d84)
-Total: ~50 functions (estimated) | Status: 6 Complete, ~44 Remaining
+Total: ~50 functions (estimated) | Status: 14 Complete, ~36 Remaining
 
 | Address    | Function Name | Status | System | Notes |
 |------------|---------------|--------|--------|-------|
@@ -1178,20 +1194,42 @@ Total: ~50 functions (estimated) | Status: 6 Complete, ~44 Remaining
 | 0x800559ec | execute_cdrom_read | **✅ Complete** | Battle | Executes CD-ROM read to buffer. Session 2026-02-15. |
 | 0x80055a5c | seek_cdrom_position | **✅ Complete** | Battle | Seeks to CD-ROM file offset. Session 2026-02-15. |
 | 0x80055ac8 | cancel_cdrom_operation | **✅ Complete** | Battle | Cancels active CD-ROM operation. Session 2026-02-15. |
+| 0x8002519c | update_entity_list_logic | **✅ Complete** | Battle | **Entity callback dispatcher - calls update_func per-frame. Session 2026-02-15.** |
+| 0x80020de0 | init_battle_graphics | Identified | Battle | Assigns entity callbacks, needs full DICK analysis. |
+| 0x80021b04 | create_battle_effect_entity | Identified | Battle | Creates entities with callbacks. Needs DICK analysis. |
+| 0x80020454 | allocate_entity_from_pool | Identified | Battle | Allocates entity from memory pool. Needs DICK analysis. |
+| 0x80020c14 | update_entity_animation_interpolation | Identified | Battle | Interpolates animation/position per-frame. Needs DICK. |
+| 0x80025000 | entity_callback_render_update | Identified | Battle | Entity callback: update animation & render. Needs DICK. |
+| 0x80025044 | entity_callback_noop | **✅ Complete** | Battle | Empty callback (returns immediately). |
+| 0x80025054 | entity_callback_sprite_update | Identified | Battle | Entity callback: sprite animation. Needs DICK. |
 | 0x80024e80 | load_battle_resource | Identified | Battle | Loads battle graphics resources. Needs DICK analysis. |
-| 0x80020de0 | init_battle_graphics | Identified | Battle | Initializes battle rendering system. Needs DICK analysis. |
 | 0x800353e0 | init_battle_audio | Identified | Battle | Initializes battle audio. Needs DICK analysis. |
 | 0x80054a6c | handle_special_battle_mode | Identified | Battle | Handles special battle mode. Needs DICK analysis. |
-| ??? | **COMBAT LOOP (UNKNOWN)** | **Unidentified** | Battle | **CRITICAL: Real AI/damage formulas NOT YET FOUND!** |
+| 0x80021df4 | entity_callback_unknown_1 | **Unanalyzed** | Battle | **Entity type 0x0015 callback (CODE segment) - NEEDS ANALYSIS** |
+| 0x8002174c | entity_callback_unknown_2 | **Unanalyzed** | Battle | **Entity type 0x0000 callback (CODE segment) - NEEDS ANALYSIS** |
+| 0x80024190 | entity_callback_unknown_3 | **Unanalyzed** | Battle | **Entity type 0x0000 callback (CODE segment) - NEEDS ANALYSIS** |
+| 0x801d820c | **combat_callback_dynamic_1** | **Unidentified** | Battle | **Dynamically loaded (RAM) - likely COMBAT AI!** |
+| 0x801f159c | **combat_callback_dynamic_2** | **Unidentified** | Battle | **Dynamically loaded (RAM) - likely COMBAT AI!** |
+| 0x801e36a0 | **combat_callback_dynamic_3** | **Unidentified** | Battle | **Dynamically loaded (RAM) - likely COMBAT AI!** |
+| 0x801d1344 | **combat_callback_dynamic_4** | **Unidentified** | Battle | **Dynamically loaded (RAM) - likely COMBAT AI!** |
 | ... | ... | Unanalyzed | Battle | ... |
 
-**Recently Completed (2026-02-15 State Machine & Battle):**
+**Recently Completed (2026-02-15 Entity Callback System Discovery):**
+- ✅ **MAJOR BREAKTHROUGH**: Discovered entity update callback system!
+- ✅ update_entity_list_logic @ 0x8002519c - Entity callback dispatcher (calls entity->update_func per-frame)
+- ✅ Found entity type descriptor table @ 0x8007062c with 10+ callback function pointers
+- ✅ Identified entity structure: offset +0x0 = next ptr, +0xc = update_func, +0x10 = flags
+- ✅ Renamed 6 entity-related functions (create_battle_effect_entity, allocate_entity_from_pool, etc.)
+- ✅ Mapped per-frame execution flow: update callbacks run BEFORE rendering
+- ⚠️ **KEY FINDING**: Combat AI/damage formulas are in DYNAMICALLY LOADED callbacks (RAM @ 0x801d-0x801f)
+- ⚠️ **NEXT STEP**: Extract battle overlays from PROT.DAT to find actual combat logic!
+
+**Completed (2026-02-15 State Machine & Battle):**
 - ✅ All 12 state handlers - 100% DICK compliance (125 lines total)
 - ✅ battle_system_main() - Battle initialization loop (138 lines, 81 symbols renamed)
 - ✅ load_player_battle_data() - Player data loading state machine (2,096 bytes, 37 symbols, 10 phases)
 - ✅ 4 CD-ROM helper functions (queue, execute, seek, cancel)
 - ✅ IMPORTANT DISCOVERY: load_player_battle_data is NOT the combat loop (misnamed previously)
-- ⚠️ **CRITICAL FINDING**: Real combat AI/damage formulas still not located!
 
 **Recently Completed (2026-02-14 DICK Session #3):**
 - ✅ init_data_tables() - Data table initialization (14 globals)

@@ -5,7 +5,7 @@
 use crate::converter::tmd_to_gltf;
 use anyhow::{Context, Result};
 use psxutils::cdrom::CdRom;
-use psxutils::formats::{Tim, Tmd, Vag};
+use psxutils::formats::{DatArchive, Tim, Tmd, Vag};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -126,6 +126,9 @@ impl AssetExtractionService {
                         self.convert_vag(&data, &output_path.with_extension("wav"))
                     } else if disc_path.ends_with(".TMD") {
                         self.convert_tmd(&data, &output_path.with_extension("gltf"))
+                    } else if disc_path.ends_with(".DAT") {
+                        // Try to extract DAT archive
+                        self.extract_dat_archive(&data, output_path, disc_path)
                     } else {
                         // Unknown format, just save raw data
                         if let Err(e) = fs::write(output_path, &data) {
@@ -283,6 +286,122 @@ impl AssetExtractionService {
             Err(e) => {
                 tracing::warn!("Failed to parse TMD: {}", e);
                 false
+            }
+        }
+    }
+
+    /// Extract DAT archive and save files
+    fn extract_dat_archive(&self, data: &[u8], output_path: &Path, disc_path: &str) -> bool {
+        match DatArchive::parse(data) {
+            Ok(archive) => {
+                tracing::info!(
+                    "Extracting DAT archive: {} ({} files)",
+                    disc_path,
+                    archive.entry_count()
+                );
+
+                // Create archive directory
+                let archive_dir = output_path.with_extension("");
+                if let Err(e) = fs::create_dir_all(&archive_dir) {
+                    tracing::warn!(
+                        "Failed to create archive directory {}: {}",
+                        archive_dir.display(),
+                        e
+                    );
+                    return false;
+                }
+
+                let mut extracted_count = 0;
+
+                // Extract each file from archive
+                for index in 0..archive.entry_count() {
+                    match archive.extract_file(index) {
+                        Ok(file_data) => {
+                            // Generate filename
+                            let filename = format!("file_{:04}.bin", index);
+                            let file_path = archive_dir.join(&filename);
+
+                            // Try to convert if recognized format
+                            let converted = if file_data.len() >= 4 {
+                                match &file_data[0..4] {
+                                    [0x10, 0x00, 0x00, 0x00] => {
+                                        // TIM texture
+                                        self.convert_tim(
+                                            file_data,
+                                            &file_path.with_extension("png"),
+                                        )
+                                    }
+                                    [b'V', b'A', b'G', b'p'] => {
+                                        // VAG audio
+                                        self.convert_vag(
+                                            file_data,
+                                            &file_path.with_extension("wav"),
+                                        )
+                                    }
+                                    _ => {
+                                        // Unknown format, save as bin
+                                        if let Err(e) = fs::write(&file_path, file_data) {
+                                            tracing::warn!(
+                                                "Failed to write {}: {}",
+                                                file_path.display(),
+                                                e
+                                            );
+                                            false
+                                        } else {
+                                            true
+                                        }
+                                    }
+                                }
+                            } else {
+                                // File too small, save as-is
+                                if let Err(e) = fs::write(&file_path, file_data) {
+                                    tracing::warn!(
+                                        "Failed to write {}: {}",
+                                        file_path.display(),
+                                        e
+                                    );
+                                    false
+                                } else {
+                                    true
+                                }
+                            };
+
+                            if converted {
+                                extracted_count += 1;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to extract file {} from {}: {}",
+                                index,
+                                disc_path,
+                                e
+                            );
+                        }
+                    }
+                }
+
+                tracing::info!(
+                    "Extracted {}/{} files from {}",
+                    extracted_count,
+                    archive.entry_count(),
+                    disc_path
+                );
+                extracted_count > 0
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse {} as DAT archive: {}, saving as raw file",
+                    disc_path,
+                    e
+                );
+                // Not a DAT archive, save as raw file
+                if let Err(e) = fs::write(output_path, data) {
+                    tracing::warn!("Failed to write {}: {}", output_path.display(), e);
+                    false
+                } else {
+                    true
+                }
             }
         }
     }

@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 description = "Asset extraction and management for Legend of Legaia"
 
+[[bin]]
+name = "legaia-extract"
+path = "src/bin/extract.rs"
+
 [[example]]
 name = "extract"
 path = "examples/extract.rs"

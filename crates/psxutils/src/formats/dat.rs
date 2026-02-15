@@ -2,22 +2,29 @@
 //!
 //! PROT.DAT and DMY.DAT are archive files containing game assets.
 //!
-//! ## Format
+//! ## Format (Verified via Ghidra analysis of SCUS_942.54)
 //!
 //! ```text
 //! [File Table]
-//! Entry 0: [sector_offset: u32, sector_count: u32]  // 8 bytes
-//! Entry 1: [sector_offset: u32, sector_count: u32]
+//! Entry 0: [start_sector: u32, end_sector: u32]  // 8 bytes per entry
+//! Entry 1: [start_sector: u32, end_sector: u32]
 //! ...
-//! Entry N: [sector_offset: u32, sector_count: u32]
+//! Entry N: [start_sector: u32, end_sector: u32]
 //!
 //! [File Data]
-//! File data starts at first non-zero sector offset (typically sector 3)
+//! File data starts after table (typically sector 3, offset 0x1800)
 //! ```
 //!
-//! - Sector size: 2048 bytes
-//! - Table size: Determined by first entry with sector_offset > table size
-//! - Entry 0 typically has sector_offset=0, representing the table itself
+//! - Sector size: 2048 bytes (CD-ROM sector size)
+//! - Format: [start_sector, end_sector] NOT [offset, count]
+//! - File size: (end_sector - start_sector) * 2048 bytes
+//! - Byte offset: start_sector * 2048
+//!
+//! ## Sources
+//! - Ghidra analysis of `load_cdrom_file` function at 0x8003e4e8
+//! - Global sector table `g_sector_table` at 0x801c70f0
+//! - PROT.DAT: 619 entries, 116 MB
+//! - DMY.DAT: 9 entries, 36 MB
 //!
 //! ## Example
 //!
@@ -40,28 +47,52 @@ use crate::{PsxError, Result};
 pub const SECTOR_SIZE: usize = 2048;
 
 /// DAT archive file table entry
+///
+/// Represents a file's location in the archive using sector-based addressing.
+/// The format is [start_sector, end_sector] where both values are sector numbers,
+/// not [offset, count].
+///
+/// ## Example
+///
+/// Entry with start_sector=3, end_sector=5:
+/// - Byte offset: 3 * 2048 = 6144
+/// - Byte size: (5 - 3) * 2048 = 4096
+/// - Byte range: 6144..10240
 #[derive(Debug, Clone, Copy)]
 pub struct DatEntry {
-    /// Sector offset (multiply by 2048 for byte offset)
-    pub sector_offset: u32,
-    /// Number of sectors
-    pub sector_count: u32,
+    /// Starting sector number (multiply by 2048 for byte offset)
+    pub start_sector: u32,
+    /// Ending sector number (exclusive, like Rust ranges)
+    pub end_sector: u32,
 }
 
 impl DatEntry {
     /// Get byte offset in archive
     pub fn byte_offset(&self) -> usize {
-        self.sector_offset as usize * SECTOR_SIZE
+        self.start_sector as usize * SECTOR_SIZE
     }
 
     /// Get file size in bytes
     pub fn byte_size(&self) -> usize {
-        self.sector_count as usize * SECTOR_SIZE
+        if self.end_sector > self.start_sector {
+            (self.end_sector - self.start_sector) as usize * SECTOR_SIZE
+        } else {
+            0
+        }
     }
 
     /// Get byte range (offset, size)
     pub fn byte_range(&self) -> (usize, usize) {
         (self.byte_offset(), self.byte_size())
+    }
+
+    /// Get sector count
+    pub fn sector_count(&self) -> u32 {
+        if self.end_sector > self.start_sector {
+            self.end_sector - self.start_sector
+        } else {
+            0
+        }
     }
 }
 
@@ -91,13 +122,13 @@ impl<'a> DatArchive<'a> {
                 break;
             }
 
-            let sector_offset = u32::from_le_bytes([
+            let start_sector = u32::from_le_bytes([
                 data[offset],
                 data[offset + 1],
                 data[offset + 2],
                 data[offset + 3],
             ]);
-            let sector_count = u32::from_le_bytes([
+            let end_sector = u32::from_le_bytes([
                 data[offset + 4],
                 data[offset + 5],
                 data[offset + 6],
@@ -105,8 +136,8 @@ impl<'a> DatArchive<'a> {
             ]);
 
             let entry = DatEntry {
-                sector_offset,
-                sector_count,
+                start_sector,
+                end_sector,
             };
 
             // Check if this entry's byte end is beyond file size (invalid)
@@ -118,7 +149,7 @@ impl<'a> DatArchive<'a> {
             }
 
             // Stop if we've hit padding (all zeros in both fields after first entry)
-            if entries.len() > 0 && sector_offset == 0 && sector_count == 0 {
+            if entries.len() > 0 && start_sector == 0 && end_sector == 0 {
                 table_size = offset;
                 break;
             }
@@ -213,13 +244,17 @@ mod tests {
 
     #[test]
     fn test_dat_entry_calculations() {
+        // Entry with start_sector=3, end_sector=8
+        // - Byte offset: 3 * 2048 = 6144
+        // - Size: (8 - 3) * 2048 = 10240
         let entry = DatEntry {
-            sector_offset: 3,
-            sector_count: 5,
+            start_sector: 3,
+            end_sector: 8,
         };
 
-        assert_eq!(entry.byte_offset(), 3 * 2048);
-        assert_eq!(entry.byte_size(), 5 * 2048);
-        assert_eq!(entry.byte_range(), (3 * 2048, 5 * 2048));
+        assert_eq!(entry.byte_offset(), 6144);
+        assert_eq!(entry.byte_size(), 10240);
+        assert_eq!(entry.sector_count(), 5);
+        assert_eq!(entry.byte_range(), (6144, 10240));
     }
 }

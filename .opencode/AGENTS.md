@@ -177,6 +177,87 @@ Before you mark ANY function as "Complete", run this checklist:
    - List ALL called functions
    - Each one should be either renamed OR documented as "TODO: analyze next"
 
+---
+
+## 🚫 CODE SEPARATION POLICY
+
+**CRITICAL: Keep decompilation analysis separate from Rust implementation code.**
+
+### What Goes Where
+
+#### ✅ Decompilation References ALLOWED:
+- `.opencode/AGENTS.md` (this file)
+- `docs/` directory (analysis documents)
+- Git commit messages
+- Internal notes and planning documents
+
+#### ❌ Decompilation References FORBIDDEN:
+- `crates/*/src/**/*.rs` - ALL Rust source code
+- `crates/*/Cargo.toml` - Package metadata
+- Rust code comments and documentation
+- Public API documentation
+
+### Forbidden Content in Rust Code
+
+DO NOT include in Rust source files:
+- ❌ PSX memory addresses (e.g., "0x8001d424", "@ 0x8007b768")
+- ❌ Original function names (e.g., "FUN_8003e4e8", "init_game_state")
+- ❌ Phrases like "based on decompilation", "discovered through analysis"
+- ❌ References to Ghidra, DICK methodology, or reverse engineering
+- ❌ Original global variable names (e.g., "g_gpu_color_mask @ 0x1f8003fc")
+- ❌ Links to .opencode/ or decompilation documentation
+
+### What IS Allowed in Rust Code
+
+DO include clean, professional descriptions:
+- ✅ Technical descriptions of what systems do
+- ✅ Purpose and behavior of functions/structs
+- ✅ Usage examples and API documentation
+- ✅ Implementation notes about algorithms or data structures
+- ✅ References to game mechanics or systems
+
+### Example - WRONG:
+```rust
+/// GPU hardware configuration (PSX GPU registers 0x1f800000 range)
+///
+/// Based on analysis of init_game_state() at 0x8001d424 (SCUS_942.54).
+/// Original: g_gpu_color_mask @ 0x1f8003fc
+pub struct GpuConfig {
+    pub color_mask: u32,  // g_gpu_color_mask @ 0x1f8003fc
+}
+```
+
+### Example - CORRECT:
+```rust
+/// GPU hardware configuration
+///
+/// Configures color processing, drawing offsets, and primitive rendering.
+pub struct GpuConfig {
+    /// Color mask for RGB channels (0xffffff = no masking)
+    pub color_mask: u32,
+}
+```
+
+### Why This Matters
+
+1. **Legal Protection**: Clean room implementation requires separation
+2. **Professionalism**: Code should stand on its own merits
+3. **Maintainability**: Future developers don't need decompilation context
+4. **Distribution**: Code can be shared without reverse engineering references
+
+### Enforcement
+
+Before committing Rust code:
+1. Search for PSX addresses (regex: `0x[0-9a-f]{8}`)
+2. Search for "decompil", "analysis", "original", "discovered"
+3. Search for "FUN_", "DAT_", "g_[a-z_]+_[a-z_]+ @"
+4. Check that all docs describe WHAT/WHY, not WHERE-FROM
+
+If you accidentally add decompilation references to Rust code:
+1. Immediately revert or amend the commit
+2. Rewrite the code with clean descriptions
+3. Update this file if the policy needs clarification
+
 **If ANY of the above checks fail, the function is NOT complete.**
 
 ---

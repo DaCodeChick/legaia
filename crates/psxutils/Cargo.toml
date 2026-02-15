@@ -22,3 +22,4 @@ tracing = { workspace = true }
 [dev-dependencies]
 # Testing utilities
 anyhow = { workspace = true }
+image = "0.25"

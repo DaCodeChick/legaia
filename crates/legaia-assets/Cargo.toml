@@ -32,13 +32,13 @@ memmap2 = { workspace = true }
 bytemuck = { workspace = true }
 
 # Image processing for texture conversion
-image = "0.25"
+image = "0.25.9"
 
 # Audio processing for WAV output
-hound = "3.5"
+hound = "3.5.1"
 
 # 3D model export (glTF)
-gltf-json = "1.4"
+gltf-json = "1.4.1"
 
 # CLI for extraction tool
 clap = { workspace = true }

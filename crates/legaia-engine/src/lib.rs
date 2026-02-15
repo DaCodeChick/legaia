@@ -11,12 +11,14 @@
 
 pub mod audio;
 pub mod battle;
+pub mod core_state;
 pub mod field;
 pub mod graphics;
 pub mod input;
 pub mod menu;
 pub mod state;
 
+pub use core_state::*;
 pub use state::{GameState, StateManager};
 
 use bevy::prelude::*;
@@ -27,6 +29,8 @@ pub struct LegaiaEnginePlugin;
 impl Plugin for LegaiaEnginePlugin {
     fn build(&self, app: &mut App) {
         app
+            // Core state resources (from decompilation analysis)
+            .add_plugins(CoreStatePlugin)
             // State management
             .init_state::<GameState>()
             .init_resource::<StateManager>()

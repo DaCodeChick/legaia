@@ -3,7 +3,9 @@ resolver = "2"
 members = [
     "crates/legaia-assets",
     "crates/legaia-engine",
-    "crates/legaia-game", "crates/psxutils",
+    "crates/legaia-game",
+    "crates/legaia_combat",
+    "crates/psxutils",
 ]
 
 [workspace.package]

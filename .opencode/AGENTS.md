@@ -1189,14 +1189,51 @@ ItemData* get_item_data(int item_id) {
 - SPU - Audio processing
 
 ### File Formats
-- **TIM**: PSX texture format
+- **TIM**: PSX texture format (✅ **916 textures extracted and verified**)
 - **TMD**: Standard PSX 3D model format (NOT used by Legend of Legaia - see below)
 - **VAB**: Voice Attribute Bank (audio samples + metadata)
-- **VAG**: Individual audio sample format
+- **VAG**: Individual audio sample format (✅ **1 file identified**)
 - **STR**: Streaming video format
 - **XA**: CD-XA audio format
 
 ### Legend of Legaia Specific Formats
+
+#### PROT.DAT Archive Structure (619 files, ~116 MB)
+Complete analysis of file types:
+- **Custom 3D Models**: 92 files (~7.5 MB) - signature `0x80000002` at offset +4
+- **Embedded TIM Textures**: 44 container files with 916 total TIM images (~15 MB extracted)
+- **Embedded VAG Audio**: 1 file (file_0612.bin, 28 KB)
+- **Dummy Files**: 138 files (282 KB) - "pochipochipochi..." placeholder pattern
+- **Zero-filled Files**: 6 files (227 KB) - padding/alignment
+- **Unknown Format**: 383 files (~42 MB) - need further analysis
+
+#### TIM Texture Extraction (Discovered 2026-02-15)
+**✅ SUCCESSFULLY EXTRACTED AND CONVERTED**
+
+Legend of Legaia stores TIM textures **embedded in container files** at various offsets, not as standalone files.
+
+**Extraction Results:**
+- **916 TIM textures** found across 44 container files
+- Largest source: file_0000.bin contains 257 embedded TIM images
+- Total extracted size: ~15 MB
+- Successfully converted sample to PNG (320x256, 8-bit indexed color)
+- TIM parser (`psxutils/src/formats/tim.rs`) verified working correctly
+
+**Example Embedded Locations:**
+- file_0000.bin: 257 TIMs starting at offset 0x1858
+- file_0447.bin: TIM at offset 0x0004 (82,464 bytes)
+- file_0001.bin: 2 TIMs at offsets 0x0058, 0x00e0
+
+**Texture Characteristics:**
+- Most common: 2,144 byte textures (likely 64x32 or similar small sprites)
+- Larger textures: 32-33 KB (likely 256x128 or 320x256 backgrounds)
+- Color modes: Primarily 8-bit indexed (Clut8Bit) with 256-color palettes
+- Some 4-bit indexed (Clut4Bit) for smaller sprites
+
+**Tools Created:**
+- `/tmp/extract_all_tims.py` - Batch extractor scanning all files for embedded TIMs
+- `crates/psxutils/examples/test_tim_convert.rs` - TIM to PNG converter
+- Output directory: `~/.local/share/legaia/assets/textures/`
 
 #### Custom 3D Model Format (Discovered 2026-02-15)
 Legend of Legaia uses a **custom 3D model format**, NOT standard PSX TMD files.

@@ -3,24 +3,53 @@
 //! Scriptable damage formulas for combat
 
 use crate::components::*;
-use rhai::{Engine, EvalAltResult, Scope};
+use mlua::prelude::*;
 
 /// Damage formula engine
 pub struct DamageEngine {
-    engine: Engine,
+    lua: Lua,
 }
 
 impl DamageEngine {
     pub fn new() -> Self {
-        let mut engine = Engine::new();
+        let lua = Lua::new();
 
         // Register damage calculation helpers
-        engine.register_fn("calculate_physical_damage", Self::calculate_physical_damage);
-        engine.register_fn("calculate_art_damage", Self::calculate_art_damage);
-        engine.register_fn("apply_defense", Self::apply_defense);
-        engine.register_fn("apply_random_variance", Self::apply_random_variance);
+        Self::register_functions(&lua).expect("Failed to register damage functions");
 
-        Self { engine }
+        Self { lua }
+    }
+
+    fn register_functions(lua: &Lua) -> LuaResult<()> {
+        let globals = lua.globals();
+
+        globals.set(
+            "calculate_physical_damage",
+            lua.create_function(|_, (atk, def, level): (i64, i64, i64)| {
+                Ok(Self::calculate_physical_damage(atk, def, level))
+            })?,
+        )?;
+
+        globals.set(
+            "calculate_art_damage",
+            lua.create_function(|_, (atk, power, def, level): (i64, i64, i64, i64)| {
+                Ok(Self::calculate_art_damage(atk, power, def, level))
+            })?,
+        )?;
+
+        globals.set(
+            "apply_defense",
+            lua.create_function(|_, (damage, defense): (i64, i64)| {
+                Ok(Self::apply_defense(damage, defense))
+            })?,
+        )?;
+
+        globals.set(
+            "apply_random_variance",
+            lua.create_function(|_, damage: i64| Ok(Self::apply_random_variance(damage)))?,
+        )?;
+
+        Ok(())
     }
 
     /// Calculate physical attack damage
@@ -61,33 +90,38 @@ impl DamageEngine {
         (damage + variance_amount).max(1)
     }
 
-    /// Execute a custom damage formula from script
+    /// Execute a custom damage formula from Lua script
     pub fn eval_damage_formula(
         &self,
         formula: &str,
         attacker: &CombatStats,
         defender: &CombatStats,
         power: u32,
-    ) -> Result<i64, Box<EvalAltResult>> {
-        let mut scope = Scope::new();
+    ) -> Result<i64, Box<dyn std::error::Error>> {
+        // Set globals for the formula
+        self.lua.globals().set("atk", attacker.attack as i64)?;
+        self.lua.globals().set("atk_level", attacker.level as i64)?;
+        self.lua.globals().set("atk_hp", attacker.hp as i64)?;
+        self.lua.globals().set("atk_mp", attacker.mp as i64)?;
 
-        // Push attacker stats
-        scope.push("atk", attacker.attack as i64);
-        scope.push("atk_level", attacker.level as i64);
-        scope.push("atk_hp", attacker.hp as i64);
-        scope.push("atk_mp", attacker.mp as i64);
+        self.lua.globals().set("def", defender.defense as i64)?;
+        self.lua.globals().set("def_level", defender.level as i64)?;
+        self.lua.globals().set("def_hp", defender.hp as i64)?;
+        self.lua
+            .globals()
+            .set("def_max_hp", defender.max_hp as i64)?;
 
-        // Push defender stats
-        scope.push("def", defender.defense as i64);
-        scope.push("def_level", defender.level as i64);
-        scope.push("def_hp", defender.hp as i64);
-        scope.push("def_max_hp", defender.max_hp as i64);
-
-        // Push power
-        scope.push("power", power as i64);
+        self.lua.globals().set("power", power as i64)?;
 
         // Evaluate formula
-        self.engine.eval_with_scope::<i64>(&mut scope, formula)
+        let result: i64 = self.lua.load(formula).eval()?;
+        Ok(result)
+    }
+}
+
+impl Default for DamageEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -133,8 +167,8 @@ mod tests {
             level: 8,
         };
 
-        // Test custom formula
-        let formula = "calculate_physical_damage(atk, def, atk_level)";
+        // Test custom formula using Lua's "return" syntax
+        let formula = "return calculate_physical_damage(atk, def, atk_level)";
         let result = engine.eval_damage_formula(formula, &attacker, &defender, 100);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 40);

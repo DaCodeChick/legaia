@@ -4,7 +4,7 @@ members = [
     "crates/legaia-assets",
     "crates/legaia-engine",
     "crates/legaia-game",
-    "crates/legaia_combat",
+    "crates/legaia_scripting",
     "crates/psxutils",
 ]
 

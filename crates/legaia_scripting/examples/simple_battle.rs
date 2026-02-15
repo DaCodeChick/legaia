@@ -1,8 +1,8 @@
 //! Example combat scenario
-//! Demonstrates the script-based combat system
+//! Demonstrates the script-based Lua combat system
 
 use bevy::prelude::*;
-use legaia_combat::*;
+use legaia_scripting::*;
 
 fn main() {
     App::new()
@@ -13,9 +13,9 @@ fn main() {
 }
 
 fn setup_battle(mut commands: Commands, mut script_engine: ResMut<ScriptEngine>) {
-    // Load AI scripts
+    // Load AI scripts (Lua)
     script_engine
-        .load_script("scripts/combat/enemy_slime.rhai")
+        .load_script("scripts/entities/enemy_slime.lua")
         .expect("Failed to load slime AI");
 
     // Spawn player character
@@ -69,7 +69,7 @@ fn setup_battle(mut commands: Commands, mut script_engine: ResMut<ScriptEngine>)
             level: 3,
         },
         ScriptCallback {
-            script_path: "scripts/combat/enemy_slime.rhai".to_string(),
+            script_path: "scripts/entities/enemy_slime.lua".to_string(),
             function: "on_update".to_string(),
         },
         ColorInterpolation {

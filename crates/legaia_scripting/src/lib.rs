@@ -1,6 +1,6 @@
-//! Legend of Legaia Combat System
+//! Legend of Legaia Scripting System
 //!
-//! Data-driven combat system using Rhai scripts for AI, formulas, and behaviors.
+//! General-purpose scripting system using Lua for entities, NPCs, combat, and environments.
 //! Based on reverse-engineered entity callback system from PSX original.
 
 pub mod components;

@@ -39,9 +39,7 @@ pub fn update_entity_callbacks(
         };
 
         // Call script callback
-        if let Err(e) =
-            script_engine.call_entity_callback(&callback.script_path, &callback.function, context)
-        {
+        if let Err(e) = script_engine.call_entity_callback(&callback.function, context) {
             error!("Script callback failed for entity {:?}: {}", entity, e);
         }
     }

@@ -32,6 +32,10 @@ use bytemuck::{Pod, Zeroable};
 /// TIM magic number (0x10)
 pub const TIM_MAGIC: u32 = 0x10;
 
+/// Maximum reasonable TIM dimensions (from jPSXdec)
+const MAX_TIM_WORD_WIDTH: u16 = 16384;
+const MAX_TIM_HEIGHT: u16 = 8192;
+
 /// TIM pixel modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PixelMode {
@@ -176,6 +180,16 @@ impl Tim {
             offset += 12;
 
             let clut_data_size = (clut_header.size as usize).saturating_sub(12);
+
+            // Sanity check for CLUT size
+            const MAX_CLUT_SIZE: usize = 256 * 2; // 256 colors * 2 bytes max
+            if clut_data_size > MAX_CLUT_SIZE {
+                return Err(PsxError::InvalidFormat(format!(
+                    "TIM CLUT data size too large: {} bytes (max {} bytes)",
+                    clut_data_size, MAX_CLUT_SIZE
+                )));
+            }
+
             if data.len() < offset + clut_data_size {
                 return Err(PsxError::InvalidFormat(
                     "TIM file truncated (CLUT data)".to_string(),
@@ -211,6 +225,17 @@ impl Tim {
         offset += 12;
 
         let pixel_data_size = (pixel_header.size as usize).saturating_sub(12);
+
+        // Sanity check: PSX VRAM is only 1MB, so texture data should be reasonable
+        // Reject absurdly large sizes that indicate corrupt data
+        const MAX_REASONABLE_SIZE: usize = 10 * 1024 * 1024; // 10MB max
+        if pixel_data_size > MAX_REASONABLE_SIZE {
+            return Err(PsxError::InvalidFormat(format!(
+                "TIM pixel data size too large: {} bytes (max {} bytes)",
+                pixel_data_size, MAX_REASONABLE_SIZE
+            )));
+        }
+
         if data.len() < offset + pixel_data_size {
             return Err(PsxError::InvalidFormat(
                 "TIM file truncated (pixel data)".to_string(),
@@ -229,6 +254,128 @@ impl Tim {
                 data: pixel_data,
             },
         })
+    }
+
+    /// Validate TIM format without allocating memory for pixel data
+    ///
+    /// This is much faster than `parse()` for scanning, as it only validates
+    /// headers and doesn't allocate Vec for pixel/CLUT data.
+    ///
+    /// Returns `Ok((width, height, total_size))` if valid, where total_size is
+    /// the size of the complete TIM file in bytes.
+    pub fn validate(data: &[u8]) -> Result<(u16, u16, usize)> {
+        if data.len() < 8 {
+            return Err(PsxError::InvalidFormat("TIM file too small".to_string()));
+        }
+
+        // Parse header
+        let header: &TimHeader = bytemuck::try_from_bytes(&data[0..8])
+            .map_err(|e| PsxError::ParseError(format!("Failed to parse TIM header: {}", e)))?;
+
+        if header.magic != TIM_MAGIC {
+            return Err(PsxError::InvalidFormat(format!(
+                "Invalid TIM magic: 0x{:08X}, expected 0x{:08X}",
+                header.magic, TIM_MAGIC
+            )));
+        }
+
+        let pixel_mode = PixelMode::from_u32(header.flags)?;
+        let has_clut = (header.flags & 0x8) != 0;
+
+        let mut offset = 8;
+        let mut total_size = 8; // Header size
+
+        // Validate CLUT if present (without reading data)
+        if has_clut {
+            if data.len() < offset + 12 {
+                return Err(PsxError::InvalidFormat(
+                    "TIM file truncated (CLUT header)".to_string(),
+                ));
+            }
+
+            let clut_header: &ClutHeader = bytemuck::try_from_bytes(&data[offset..offset + 12])
+                .map_err(|e| PsxError::ParseError(format!("Failed to parse CLUT header: {}", e)))?;
+
+            offset += 12;
+
+            let clut_data_size = (clut_header.size as usize).saturating_sub(12);
+
+            // Sanity check for CLUT size
+            const MAX_CLUT_SIZE: usize = 256 * 2; // 256 colors * 2 bytes max
+            if clut_data_size > MAX_CLUT_SIZE {
+                return Err(PsxError::InvalidFormat(format!(
+                    "TIM CLUT data size too large: {} bytes (max {} bytes)",
+                    clut_data_size, MAX_CLUT_SIZE
+                )));
+            }
+
+            // Validate CLUT dimensions
+            if clut_header.width > MAX_TIM_WORD_WIDTH || clut_header.height > MAX_TIM_HEIGHT {
+                return Err(PsxError::InvalidFormat(format!(
+                    "TIM CLUT dimensions too large: {}x{} (max {}x{})",
+                    clut_header.width, clut_header.height, MAX_TIM_WORD_WIDTH, MAX_TIM_HEIGHT
+                )));
+            }
+
+            if data.len() < offset + clut_data_size {
+                return Err(PsxError::InvalidFormat(
+                    "TIM file truncated (CLUT data)".to_string(),
+                ));
+            }
+
+            offset += clut_data_size;
+            total_size += 12 + clut_data_size;
+        }
+
+        // Validate pixel data (without reading data)
+        if data.len() < offset + 12 {
+            return Err(PsxError::InvalidFormat(
+                "TIM file truncated (pixel header)".to_string(),
+            ));
+        }
+
+        let pixel_header: &PixelHeader = bytemuck::try_from_bytes(&data[offset..offset + 12])
+            .map_err(|e| PsxError::ParseError(format!("Failed to parse pixel header: {}", e)))?;
+
+        offset += 12;
+
+        let pixel_data_size = (pixel_header.size as usize).saturating_sub(12);
+
+        // Validate pixel dimensions
+        if pixel_header.width > MAX_TIM_WORD_WIDTH || pixel_header.height > MAX_TIM_HEIGHT {
+            return Err(PsxError::InvalidFormat(format!(
+                "TIM pixel dimensions too large: {}x{} (max {}x{})",
+                pixel_header.width, pixel_header.height, MAX_TIM_WORD_WIDTH, MAX_TIM_HEIGHT
+            )));
+        }
+
+        // Sanity check: calculate maximum possible size based on dimensions
+        let max_possible_size = (MAX_TIM_WORD_WIDTH as usize * 2 * MAX_TIM_HEIGHT as usize) + 12;
+        if pixel_data_size > max_possible_size {
+            return Err(PsxError::InvalidFormat(format!(
+                "TIM pixel data size too large: {} bytes (max {} bytes)",
+                pixel_data_size, max_possible_size
+            )));
+        }
+
+        if data.len() < offset + pixel_data_size {
+            return Err(PsxError::InvalidFormat(
+                "TIM file truncated (pixel data)".to_string(),
+            ));
+        }
+
+        total_size += 12 + pixel_data_size;
+
+        // Calculate actual pixel dimensions
+        let width = match pixel_mode {
+            PixelMode::Clut4Bit => pixel_header.width * 4,
+            PixelMode::Clut8Bit => pixel_header.width * 2,
+            PixelMode::Direct16Bit => pixel_header.width,
+            PixelMode::Direct24Bit => pixel_header.width * 2 / 3,
+            PixelMode::Mixed => pixel_header.width,
+        };
+
+        Ok((width, pixel_header.height, total_size))
     }
 
     /// Convert to RGBA8 format

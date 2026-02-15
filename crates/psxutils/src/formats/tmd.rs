@@ -141,6 +141,15 @@ impl Tmd {
             return Err(PsxError::ParseError("TMD has zero objects".to_string()));
         }
 
+        // Sanity check: reject absurdly large object counts
+        const MAX_OBJECTS: usize = 1000;
+        if num_objects > MAX_OBJECTS {
+            return Err(PsxError::ParseError(format!(
+                "TMD object count too large: {} (max {})",
+                num_objects, MAX_OBJECTS
+            )));
+        }
+
         // Parse object table (starts at offset 12)
         let mut objects = Vec::with_capacity(num_objects);
         let obj_table_offset = 12;
@@ -182,6 +191,24 @@ impl Tmd {
                 as usize;
         let scale =
             i32::from_le_bytes([obj_entry[24], obj_entry[25], obj_entry[26], obj_entry[27]]);
+
+        // Sanity checks for vertex/normal counts
+        const MAX_VERTS: usize = 100000;
+        const MAX_NORMALS: usize = 100000;
+
+        if vert_count > MAX_VERTS {
+            return Err(PsxError::ParseError(format!(
+                "TMD vertex count too large: {} (max {})",
+                vert_count, MAX_VERTS
+            )));
+        }
+
+        if normal_count > MAX_NORMALS {
+            return Err(PsxError::ParseError(format!(
+                "TMD normal count too large: {} (max {})",
+                normal_count, MAX_NORMALS
+            )));
+        }
 
         // Parse vertices
         let mut vertices = Vec::with_capacity(vert_count);

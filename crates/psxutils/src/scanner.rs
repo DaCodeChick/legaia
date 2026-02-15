@@ -65,11 +65,11 @@ impl<'a> AssetScanner<'a> {
         // Scan for TIM textures
         assets.extend(self.scan_tim());
 
-        // Scan for TMD models
-        assets.extend(self.scan_tmd());
+        // Scan for TMD models - DISABLED: causes OOM
+        // assets.extend(self.scan_tmd());
 
-        // Scan for VAG audio
-        assets.extend(self.scan_vag());
+        // Scan for VAG audio - DISABLED: causes OOM
+        // assets.extend(self.scan_vag());
 
         // Sort by offset
         assets.sort_by_key(|a| a.offset);
@@ -93,22 +93,22 @@ impl<'a> AssetScanner<'a> {
                 ]);
 
                 if magic == TIM_MAGIC {
-                    // Try to parse and validate TIM
-                    if let Ok(tim) = Tim::parse(&self.data[offset..]) {
-                        let size = tim.data_size();
-
-                        if size >= self.min_size {
-                            assets.push(DiscoveredAsset {
-                                offset,
-                                size,
-                                asset_type: AssetType::Tim {
-                                    width: tim.width(),
-                                    height: tim.height(),
-                                },
-                            });
-                            // Skip past this TIM
-                            offset += size;
-                            continue;
+                    // Try to validate TIM without allocating memory
+                    match Tim::validate(&self.data[offset..]) {
+                        Ok((width, height, size)) => {
+                            if size >= self.min_size {
+                                assets.push(DiscoveredAsset {
+                                    offset,
+                                    size,
+                                    asset_type: AssetType::Tim { width, height },
+                                });
+                                // Skip past this TIM
+                                offset += size;
+                                continue;
+                            }
+                        }
+                        Err(_e) => {
+                            // TIM magic but invalid format - just skip
                         }
                     }
                 }

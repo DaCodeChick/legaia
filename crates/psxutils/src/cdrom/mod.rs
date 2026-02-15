@@ -216,7 +216,7 @@ impl CdRom {
         let mut offset = 0;
 
         // Read directory data
-        let dir_data = self.read_data(dir_lba, dir_size)?;
+        let dir_data = self.read_data(dir_lba, dir_size as usize)?;
 
         while offset < dir_data.len() {
             // First byte is the record length
@@ -296,14 +296,30 @@ impl CdRom {
         }))
     }
 
-    /// Read data from consecutive sectors
-    fn read_data(&self, start_lba: u32, size: u32) -> Result<Vec<u8>> {
-        let sector_count = ((size as usize + DATA_SIZE - 1) / DATA_SIZE) as u32;
-        let mut data = Vec::with_capacity(size as usize);
+    /// Read data from consecutive sectors starting at the given LBA
+    ///
+    /// This method is useful for reading arbitrary data from the disc when you
+    /// know the LBA and size.
+    ///
+    /// # Arguments
+    /// * `start_lba` - Starting logical block address
+    /// * `size` - Number of bytes to read
+    pub fn read_data(&self, start_lba: u32, size: usize) -> Result<Vec<u8>> {
+        // Sanity check: reject absurdly large sizes
+        const MAX_READ_SIZE: usize = 100 * 1024 * 1024; // 100MB max per read
+        if size > MAX_READ_SIZE {
+            return Err(PsxError::ParseError(format!(
+                "Read size too large: {} bytes (max {} bytes)",
+                size, MAX_READ_SIZE
+            )));
+        }
+
+        let sector_count = ((size + DATA_SIZE - 1) / DATA_SIZE) as u32;
+        let mut data = Vec::with_capacity(size);
 
         for i in 0..sector_count {
             let sector = self.read_sector(start_lba + i)?;
-            let to_copy = std::cmp::min(DATA_SIZE, size as usize - data.len());
+            let to_copy = std::cmp::min(DATA_SIZE, size - data.len());
             data.extend_from_slice(&sector[..to_copy]);
         }
 
@@ -357,7 +373,7 @@ impl CdRom {
         }
 
         // Read the file data
-        self.read_data(entry.lba, entry.size)
+        self.read_data(entry.lba, entry.size as usize)
     }
 
     /// Get the total number of sectors

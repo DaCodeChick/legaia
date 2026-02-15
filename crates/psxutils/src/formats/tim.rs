@@ -345,6 +345,23 @@ impl Tim {
     pub fn height(&self) -> u16 {
         self.pixels.dimensions.1
     }
+
+    /// Get the total size of the TIM file in bytes
+    pub fn data_size(&self) -> usize {
+        let mut size = 8; // Header (magic + flags)
+
+        // Add CLUT block size if present
+        if let Some(clut) = &self.clut {
+            size += 12; // CLUT header
+            size += clut.data.len() * 2; // CLUT data (u16 entries)
+        }
+
+        // Add pixel block size
+        size += 12; // Pixel header
+        size += self.pixels.data.len(); // Pixel data
+
+        size
+    }
 }
 
 #[cfg(test)]

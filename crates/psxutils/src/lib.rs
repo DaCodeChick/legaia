@@ -8,8 +8,13 @@
 //! - **TIM**: Texture Image format (4/8/16/24-bit)
 //! - **VAB**: Sound bank format
 //! - **VAG**: Sound sample format (ADPCM)
-//! - **TMD**: 3D model format (planned)
+//! - **TMD**: 3D model format
 //! - **STR**: Movie/video format (planned)
+//!
+//! ## Asset Scanning
+//!
+//! The `scanner` module provides tools for discovering embedded assets in
+//! binary containers by scanning for format signatures.
 //!
 //! ## Example
 //!
@@ -31,10 +36,12 @@
 
 pub mod cdrom;
 pub mod formats;
+pub mod scanner;
 
 // Re-export commonly used types
 pub use cdrom::CdRom;
-pub use formats::{tim::Tim, vab::Vab, vag::Vag};
+pub use formats::{tim::Tim, tmd::Tmd, vab::Vab, vag::Vag};
+pub use scanner::{AssetScanner, AssetType, DiscoveredAsset};
 
 /// Common error type for psxutils
 #[derive(Debug, thiserror::Error)]

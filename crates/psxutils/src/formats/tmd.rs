@@ -1,12 +1,12 @@
 //! TMD (PlayStation Model Data) format parser
 //!
-//! Supports both standard PSX TMD format and Legend of Legaia custom TMD format.
+//! Parses standard PSX TMD (PlayStation Model Data) format files.
 //!
-//! ## Standard PSX TMD Format
+//! ## TMD Format Structure
 //!
 //! ```text
 //! Header (12 bytes):
-//!   u32 id            // 0x00000041 (fixed)
+//!   u32 id            // 0x00000041 (fixed magic number)
 //!   u32 flags         // Flags (usually 0)
 //!   u32 num_objects   // Number of objects in file
 //!
@@ -23,35 +23,11 @@
 //! Vertex/Normal Data: i16 x, y, z + u16 padding (8 bytes each)
 //! Primitive Data: Variable format based on primitive type
 //! ```
-//!
-//! ## Legend of Legaia Custom TMD Format
-//!
-//! ```text
-//! Header (40 bytes):
-//!   u32 file_size_hint   // Offset 0: File size or hint
-//!   u32 signature        // Offset 4: 0x80000002 (custom marker)
-//!   u32 unknown          // Offset 8: Usually 0
-//!   Object metadata (28 bytes at offset 12):
-//!     u32 type_count     // Usually 2
-//!     u32 prim_offset    // Offset to primitive section
-//!     u32 prim_count     // Number of primitives
-//!     u32 normal_offset  // Offset to normal section
-//!     u32 field5         // Usually 0
-//!     u32 vertex_offset  // Offset to vertex section (usually 56)
-//!     u32 vertex_count   // Number of vertices
-//!
-//! Vertex Data: Same as standard TMD (i16 x, y, z + u16 flags)
-//! Normal Data: Same as standard TMD (i16 nx, ny, nz + u16 padding)
-//! Primitive Data: Same packet format as standard TMD
-//! ```
 
 use crate::{PsxError, Result};
 
-/// TMD format magic number (standard PSX TMD)
+/// TMD format magic number
 pub const TMD_MAGIC: u32 = 0x00000041;
-
-/// Legend of Legaia custom TMD format signature
-pub const LEGAIA_TMD_MAGIC: u32 = 0x80000002;
 
 /// TMD model file
 #[derive(Debug, Clone)]
@@ -136,8 +112,7 @@ pub struct TextureInfo {
 impl Tmd {
     /// Parse a TMD file from bytes
     ///
-    /// Automatically detects and parses both standard PSX TMD (magic 0x00000041)
-    /// and Legend of Legaia custom TMD (magic 0x80000002 at offset +4).
+    /// Parses standard PSX TMD format with magic number 0x00000041.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 12 {
             return Err(PsxError::ParseError(
@@ -145,24 +120,16 @@ impl Tmd {
             ));
         }
 
-        // Check magic at offset 0 (standard TMD)
+        // Check magic at offset 0
         let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-        if magic == TMD_MAGIC {
-            return Self::parse_standard_tmd(data);
+        if magic != TMD_MAGIC {
+            return Err(PsxError::ParseError(format!(
+                "Invalid TMD magic number: expected {:#010x}, found {:#010x}",
+                TMD_MAGIC, magic
+            )));
         }
 
-        // Check magic at offset 4 (Legend of Legaia custom TMD)
-        if data.len() >= 8 {
-            let magic_offset4 = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-            if magic_offset4 == LEGAIA_TMD_MAGIC {
-                return Self::parse_legaia_tmd(data);
-            }
-        }
-
-        Err(PsxError::ParseError(format!(
-            "Unknown TMD format (magic at offset 0: {:#010x})",
-            magic
-        )))
+        Self::parse_standard_tmd(data)
     }
 
     /// Parse standard PSX TMD format
@@ -193,117 +160,6 @@ impl Tmd {
         }
 
         Ok(Self { flags, objects })
-    }
-
-    /// Parse Legend of Legaia custom TMD format
-    ///
-    /// Header structure (40 bytes):
-    /// - u32 file_size_hint (offset 0)
-    /// - u32 signature 0x80000002 (offset 4)
-    /// - u32 unknown (offset 8)
-    /// - Object metadata (28 bytes at offset 12):
-    ///   - u32 type/count (usually 2)
-    ///   - u32 primitive_offset
-    ///   - u32 primitive_count
-    ///   - u32 normal_offset
-    ///   - u32 field5 (usually 0)
-    ///   - u32 vertex_offset (usually 56)
-    ///   - u32 vertex_count
-    fn parse_legaia_tmd(data: &[u8]) -> Result<Self> {
-        if data.len() < 40 {
-            return Err(PsxError::ParseError(
-                "Legaia TMD file too small for header".to_string(),
-            ));
-        }
-
-        // Parse header
-        let _file_size_hint = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
-        let _unknown = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
-
-        // Parse object metadata (28 bytes at offset 12)
-        let _type_count = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
-        let prim_offset = u32::from_le_bytes([data[16], data[17], data[18], data[19]]) as usize;
-        let prim_count = u32::from_le_bytes([data[20], data[21], data[22], data[23]]) as usize;
-        let normal_offset = u32::from_le_bytes([data[24], data[25], data[26], data[27]]) as usize;
-        let _field5 = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
-        let vert_offset = u32::from_le_bytes([data[32], data[33], data[34], data[35]]) as usize;
-        let vert_count = u32::from_le_bytes([data[36], data[37], data[38], data[39]]) as usize;
-
-        // Parse vertices (format: i16 x, y, z, u16 flags)
-        let mut vertices = Vec::with_capacity(vert_count);
-        for i in 0..vert_count {
-            let voffset = vert_offset + (i * 8);
-            if voffset + 8 > data.len() {
-                return Err(PsxError::ParseError(format!(
-                    "Legaia TMD vertex {} out of bounds",
-                    i
-                )));
-            }
-
-            let vdata = &data[voffset..voffset + 8];
-            vertices.push(TmdVertex {
-                x: i16::from_le_bytes([vdata[0], vdata[1]]),
-                y: i16::from_le_bytes([vdata[2], vdata[3]]),
-                z: i16::from_le_bytes([vdata[4], vdata[5]]),
-            });
-        }
-
-        // Parse normals (format: i16 nx, ny, nz, u16 padding)
-        // Calculate normal count based on file_size_hint (actual data ends there)
-        let normal_section_end = _file_size_hint.min(data.len());
-        let normal_count = if normal_offset < normal_section_end {
-            (normal_section_end - normal_offset) / 8
-        } else {
-            0
-        };
-
-        let mut normals = Vec::with_capacity(normal_count);
-        for i in 0..normal_count {
-            let noffset = normal_offset + (i * 8);
-            if noffset + 8 > data.len() {
-                break; // Stop if we run out of data
-            }
-
-            let ndata = &data[noffset..noffset + 8];
-            normals.push(TmdNormal {
-                nx: i16::from_le_bytes([ndata[0], ndata[1]]),
-                ny: i16::from_le_bytes([ndata[2], ndata[3]]),
-                nz: i16::from_le_bytes([ndata[4], ndata[5]]),
-            });
-        }
-
-        // Parse primitives (same format as standard TMD)
-        let mut primitives = Vec::new();
-        let mut prim_pos = prim_offset;
-
-        for _ in 0..prim_count {
-            if prim_pos >= data.len() {
-                break;
-            }
-
-            if prim_pos + 4 > data.len() {
-                break;
-            }
-
-            let prim = Self::parse_primitive(data, prim_pos)?;
-            let packet_size = Self::primitive_packet_size(data, prim_pos)?;
-
-            primitives.push(prim);
-            prim_pos += packet_size;
-        }
-
-        // Create single object (Legaia TMD appears to have one object per file)
-        let object = TmdObject {
-            vertices,
-            normals,
-            primitives,
-            scale: 1, // Legaia format doesn't specify scale, assume 1
-        };
-
-        Ok(Self {
-            flags: 0, // Legaia format doesn't have flags
-            objects: vec![object],
-        })
     }
 
     /// Parse a single object from the object table entry

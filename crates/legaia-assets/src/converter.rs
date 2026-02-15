@@ -112,7 +112,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             byte_stride: None,
             extensions: None,
             extras: Default::default(),
-            name: None,
             target: Some(json::validation::Checked::Valid(
                 json::buffer::Target::ArrayBuffer,
             )),
@@ -128,7 +127,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             )),
             extensions: None,
             extras: Default::default(),
-            name: None,
             type_: json::validation::Checked::Valid(json::accessor::Type::Vec3),
             min: Some(json::Value::from(vec![pos_min[0], pos_min[1], pos_min[2]])),
             max: Some(json::Value::from(vec![pos_max[0], pos_max[1], pos_max[2]])),
@@ -150,7 +148,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
                 byte_stride: None,
                 extensions: None,
                 extras: Default::default(),
-                name: None,
                 target: Some(json::validation::Checked::Valid(
                     json::buffer::Target::ArrayBuffer,
                 )),
@@ -166,7 +163,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
                 ),
                 extensions: None,
                 extras: Default::default(),
-                name: None,
                 type_: json::validation::Checked::Valid(json::accessor::Type::Vec3),
                 min: None,
                 max: None,
@@ -192,7 +188,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             byte_stride: None,
             extensions: None,
             extras: Default::default(),
-            name: None,
             target: Some(json::validation::Checked::Valid(
                 json::buffer::Target::ElementArrayBuffer,
             )),
@@ -208,7 +203,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             )),
             extensions: None,
             extras: Default::default(),
-            name: None,
             type_: json::validation::Checked::Valid(json::accessor::Type::Scalar),
             min: None,
             max: None,
@@ -244,7 +238,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
         meshes.push(json::Mesh {
             extensions: None,
             extras: Default::default(),
-            name: None,
             primitives: vec![primitive],
             weights: None,
         });
@@ -266,7 +259,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             extras: Default::default(),
             matrix: None,
             mesh: Some(json::Index::new(i as u32)),
-            name: None,
             rotation: None,
             scale: None,
             translation: None,
@@ -279,7 +271,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
     let scene = json::Scene {
         extensions: None,
         extras: Default::default(),
-        name: None,
         nodes: nodes
             .iter()
             .enumerate()
@@ -293,7 +284,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
         byte_length: USize64::from(buffer_data.len()),
         extensions: None,
         extras: Default::default(),
-        name: None,
         uri: Some(format!(
             "{}.bin",
             output_path.file_stem().unwrap().to_string_lossy()

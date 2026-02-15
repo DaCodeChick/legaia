@@ -209,13 +209,19 @@ pub struct CodingInfo {
 }
 
 impl CodingInfo {
+    const MASK_BITS_PER_SAMPLE: u8 = 0x10; // Bit 4
+    const MASK_SAMPLE_RATE: u8 = 0x04; // Bit 2
+    const MASK_STEREO: u8 = 0x01; // Bit 0
+    const MASK_EMPHASIS: u8 = 0x40; // Bit 6
+    const MASK_RESERVED: u8 = 0x2A; // Bits 5, 3, 1 (reserved, must be 0)
+
     pub fn from_byte(byte: u8) -> Self {
         Self { bits: byte }
     }
 
     /// Get bits per sample (4 or 8)
     pub fn bits_per_sample(&self) -> u8 {
-        if self.bits & 0x10 == 0 {
+        if self.bits & Self::MASK_BITS_PER_SAMPLE == 0 {
             4
         } else {
             8
@@ -224,7 +230,7 @@ impl CodingInfo {
 
     /// Get sample rate in Hz (37800 or 18900)
     pub fn sample_rate(&self) -> u32 {
-        if self.bits & 0x04 == 0 {
+        if self.bits & Self::MASK_SAMPLE_RATE == 0 {
             37800
         } else {
             18900
@@ -233,19 +239,19 @@ impl CodingInfo {
 
     /// Check if stereo (true) or mono (false)
     pub fn is_stereo(&self) -> bool {
-        self.bits & 0x01 != 0
+        self.bits & Self::MASK_STEREO != 0
     }
 
     /// Check if emphasis flag is set
     pub fn has_emphasis(&self) -> bool {
-        self.bits & 0x40 != 0
+        self.bits & Self::MASK_EMPHASIS != 0
     }
 
     /// Validate coding info
     ///
     /// Bits 5, 3, and 1 must be 0 (reserved/unused)
     pub fn is_valid(&self) -> bool {
-        self.bits & 0x2A == 0
+        self.bits & Self::MASK_RESERVED == 0
     }
 }
 

@@ -3,6 +3,18 @@
 use super::types::*;
 use crate::{PsxError, Result};
 
+/// Convert RGB555 color to RGBA8 format
+///
+/// PSX RGB555 format: 0BBBBBGGGGGRRRRR (15-bit color + 1 transparency bit)
+#[inline]
+fn rgb555_to_rgba(color: u16) -> [u8; 4] {
+    let r = ((color & 0x1F) << 3) as u8;
+    let g = (((color >> 5) & 0x1F) << 3) as u8;
+    let b = (((color >> 10) & 0x1F) << 3) as u8;
+    let a = if color & 0x8000 == 0 { 0 } else { 255 }; // Bit 15 = transparency
+    [r, g, b, a]
+}
+
 impl Tim {
     /// Convert to RGBA8 format
     ///
@@ -26,13 +38,7 @@ impl Tim {
 
         for chunk in self.pixels.data.chunks_exact(2) {
             let color = u16::from_le_bytes([chunk[0], chunk[1]]);
-            // RGB555 format: 0BBBBBGGGGGRRRRR
-            let r = ((color & 0x1F) << 3) as u8;
-            let g = (((color >> 5) & 0x1F) << 3) as u8;
-            let b = (((color >> 10) & 0x1F) << 3) as u8;
-            let a = if color & 0x8000 == 0 { 0 } else { 255 }; // Semi-transparency bit
-
-            rgba.extend_from_slice(&[r, g, b, a]);
+            rgba.extend_from_slice(&rgb555_to_rgba(color));
         }
 
         Ok(rgba)
@@ -68,11 +74,7 @@ impl Tim {
             for idx in [idx1, idx2] {
                 if idx < clut.data.len() {
                     let color = clut.data[idx];
-                    let r = ((color & 0x1F) << 3) as u8;
-                    let g = (((color >> 5) & 0x1F) << 3) as u8;
-                    let b = (((color >> 10) & 0x1F) << 3) as u8;
-                    let a = if color & 0x8000 == 0 { 0 } else { 255 };
-                    rgba.extend_from_slice(&[r, g, b, a]);
+                    rgba.extend_from_slice(&rgb555_to_rgba(color));
                 }
             }
         }
@@ -94,11 +96,7 @@ impl Tim {
             let idx = idx as usize;
             if idx < clut.data.len() {
                 let color = clut.data[idx];
-                let r = ((color & 0x1F) << 3) as u8;
-                let g = (((color >> 5) & 0x1F) << 3) as u8;
-                let b = (((color >> 10) & 0x1F) << 3) as u8;
-                let a = if color & 0x8000 == 0 { 0 } else { 255 };
-                rgba.extend_from_slice(&[r, g, b, a]);
+                rgba.extend_from_slice(&rgb555_to_rgba(color));
             }
         }
 

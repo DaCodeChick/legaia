@@ -624,6 +624,40 @@ When splitting modules, update:
 
 ---
 
+## 📦 Dependency Management & Breaking Changes
+
+### gltf-json Name Field Context (2026-02-15)
+
+**IMPORTANT**: The `gltf-json` crate version 1.4.1+ requires a `name: Option<String>` field in various struct initializations.
+
+**Background:**
+- User fixed this in commit 711e624 (2026-02-15)
+- Added `name: None` to ~10 struct initializations in `crates/legaia-assets/src/converter.rs`
+- This is CORRECT and INTENTIONAL - the API requires this field
+
+**DO NOT:**
+- ❌ Remove these `name: None` fields
+- ❌ Question why they exist
+- ❌ Try to "fix" or "clean up" these fields
+- ❌ Mark them as "unused" or "unnecessary"
+
+**WHY:**
+- This is a gltf-json API requirement, not optional
+- Removing them will cause compilation errors
+- User explicitly stated: "Leave the name field be. Let it exist."
+
+**Related Files:**
+- `crates/legaia-assets/src/converter.rs` - Contains the name field additions
+- `crates/legaia-assets/Cargo.toml` - Tracks gltf-json dependency version
+
+**If you encounter similar dependency updates:**
+1. Check the changelog for breaking changes
+2. Update code to match new API requirements
+3. Add a note here documenting the context
+4. Prevent future agents from reverting fixes
+
+---
+
 ## 📋 Naming Conventions
 
 ### Functions

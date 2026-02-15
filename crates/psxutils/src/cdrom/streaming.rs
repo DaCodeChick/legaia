@@ -2,6 +2,8 @@
 //!
 //! Types and constants for CD-ROM streaming operations used in PSX games.
 
+use bitflags::bitflags;
+
 /// CD-ROM system state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CdromState {
@@ -26,43 +28,54 @@ pub enum CdromAsyncMode {
     Async = 1,
 }
 
+bitflags! {
+    /// CD-ROM streaming mode flags
+    ///
+    /// Control flags for CD-ROM streaming operations:
+    /// - START_ASYNC: Start asynchronous read operation
+    /// - WAIT_COMPLETE: Wait for operation to complete before returning
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct StreamModeFlags: u32 {
+        const START_ASYNC = 0x01;
+        const WAIT_COMPLETE = 0x02;
+    }
+}
+
 /// CD-ROM streaming parameters
 #[derive(Debug, Clone, Copy)]
 pub struct CdromStreamParams {
     /// Sector count to read
     pub sector_count: u32,
 
-    /// Mode flags:
-    /// - Bit 0 (0x01): Start async read
-    /// - Bit 1 (0x02): Wait for completion
-    pub mode_flags: u32,
+    /// Mode flags for streaming operation
+    pub mode_flags: StreamModeFlags,
 }
 
 impl CdromStreamParams {
     /// Create new stream parameters
     pub const fn new(sector_count: u32, start_async: bool, wait_complete: bool) -> Self {
-        let mut flags = 0u32;
+        let mut flags = StreamModeFlags::empty().bits();
         if start_async {
-            flags |= 0x01;
+            flags |= StreamModeFlags::START_ASYNC.bits();
         }
         if wait_complete {
-            flags |= 0x02;
+            flags |= StreamModeFlags::WAIT_COMPLETE.bits();
         }
 
         Self {
             sector_count,
-            mode_flags: flags,
+            mode_flags: StreamModeFlags::from_bits_truncate(flags),
         }
     }
 
     /// Check if async read should start
     pub const fn should_start_async(&self) -> bool {
-        (self.mode_flags & 0x01) != 0
+        self.mode_flags.contains(StreamModeFlags::START_ASYNC)
     }
 
     /// Check if should wait for completion
     pub const fn should_wait_complete(&self) -> bool {
-        (self.mode_flags & 0x02) != 0
+        self.mode_flags.contains(StreamModeFlags::WAIT_COMPLETE)
     }
 }
 
@@ -157,11 +170,14 @@ mod tests {
         let params = CdromStreamParams::new(100, true, false);
         assert!(params.should_start_async());
         assert!(!params.should_wait_complete());
-        assert_eq!(params.mode_flags, 0x01);
+        assert_eq!(params.mode_flags, StreamModeFlags::START_ASYNC);
 
         let params = CdromStreamParams::new(100, true, true);
         assert!(params.should_start_async());
         assert!(params.should_wait_complete());
-        assert_eq!(params.mode_flags, 0x03);
+        assert_eq!(
+            params.mode_flags,
+            StreamModeFlags::START_ASYNC | StreamModeFlags::WAIT_COMPLETE
+        );
     }
 }

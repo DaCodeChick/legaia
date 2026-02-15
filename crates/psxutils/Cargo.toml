@@ -13,6 +13,9 @@ thiserror = { workspace = true }
 # Binary parsing
 bytemuck = { workspace = true }
 
+# Bit flags
+bitflags = "2.6"
+
 # Memory-mapped file I/O for disc images
 memmap2 = { workspace = true }
 

@@ -17,6 +17,7 @@
 //! - `jpsxdec/src/jpsxdec/cdreaders/CdSectorXaSubHeader.java`
 //! - `jpsxdec/src/jpsxdec/modules/xa/SectorXaAudio.java`
 
+use bitflags::bitflags;
 use std::fmt;
 
 /// Size of XA sub-header in bytes
@@ -75,7 +76,7 @@ impl XaSubHeader {
         // we just require the copies to match
         if file_number1 != file_number2
             || channel1 != channel2
-            || sub_mode1.bits != sub_mode2.bits
+            || sub_mode1 != sub_mode2
             || coding_info1.bits != coding_info2.bits
         {
             return None;
@@ -106,66 +107,66 @@ impl XaSubHeader {
     }
 }
 
-/// Sub-mode flags
-///
-/// 8-bit flag field with the following bits:
-/// - Bit 7: End of File (EOF)
-/// - Bit 6: Real-Time (RT)
-/// - Bit 5: Form (0=Form1, 1=Form2)
-/// - Bit 4: Trigger
-/// - Bit 3: Data
-/// - Bit 2: Audio
-/// - Bit 1: Video
-/// - Bit 0: End of Record (EOR)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SubMode {
-    bits: u8,
+bitflags! {
+    /// Sub-mode flags
+    ///
+    /// 8-bit flag field with the following bits:
+    /// - Bit 7: End of File (EOF)
+    /// - Bit 6: Real-Time (RT)
+    /// - Bit 5: Form (0=Form1, 1=Form2)
+    /// - Bit 4: Trigger
+    /// - Bit 3: Data
+    /// - Bit 2: Audio
+    /// - Bit 1: Video
+    /// - Bit 0: End of Record (EOR)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct SubMode: u8 {
+        const END_OF_FILE = 0x80;
+        const REAL_TIME = 0x40;
+        const FORM = 0x20;
+        const TRIGGER = 0x10;
+        const DATA = 0x08;
+        const AUDIO = 0x04;
+        const VIDEO = 0x02;
+        const END_OF_RECORD = 0x01;
+    }
 }
 
 impl SubMode {
-    pub const MASK_END_OF_FILE: u8 = 0x80;
-    pub const MASK_REAL_TIME: u8 = 0x40;
-    pub const MASK_FORM: u8 = 0x20;
-    pub const MASK_TRIGGER: u8 = 0x10;
-    pub const MASK_DATA: u8 = 0x08;
-    pub const MASK_AUDIO: u8 = 0x04;
-    pub const MASK_VIDEO: u8 = 0x02;
-    pub const MASK_END_OF_RECORD: u8 = 0x01;
-
     pub const fn from_byte(byte: u8) -> Self {
-        Self { bits: byte }
+        Self::from_bits_truncate(byte)
     }
 
     pub const fn is_end_of_file(&self) -> bool {
-        self.bits & Self::MASK_END_OF_FILE != 0
+        self.contains(Self::END_OF_FILE)
     }
 
     pub const fn is_real_time(&self) -> bool {
-        self.bits & Self::MASK_REAL_TIME != 0
+        self.contains(Self::REAL_TIME)
     }
 
     pub const fn is_form2(&self) -> bool {
-        self.bits & Self::MASK_FORM != 0
+        self.contains(Self::FORM)
     }
 
     pub const fn is_trigger(&self) -> bool {
-        self.bits & Self::MASK_TRIGGER != 0
+        self.contains(Self::TRIGGER)
     }
 
     pub const fn is_data(&self) -> bool {
-        self.bits & Self::MASK_DATA != 0
+        self.contains(Self::DATA)
     }
 
     pub const fn is_audio(&self) -> bool {
-        self.bits & Self::MASK_AUDIO != 0
+        self.contains(Self::AUDIO)
     }
 
     pub const fn is_video(&self) -> bool {
-        self.bits & Self::MASK_VIDEO != 0
+        self.contains(Self::VIDEO)
     }
 
     pub const fn is_end_of_record(&self) -> bool {
-        self.bits & Self::MASK_END_OF_RECORD != 0
+        self.contains(Self::END_OF_RECORD)
     }
 
     /// Validate sub-mode flags
@@ -173,7 +174,7 @@ impl SubMode {
     /// Data, Audio, and Video bits should be mutually exclusive
     /// (only one of these three flags should be set)
     pub const fn is_valid(&self) -> bool {
-        let dav_bits = (self.bits >> 1) & 0x07; // Extract bits 3,2,1 (Data, Audio, Video)
+        let dav_bits = (self.bits() >> 1) & 0x07; // Extract bits 3,2,1 (Data, Audio, Video)
         let count = dav_bits.count_ones();
         count <= 1 // At most one of Data/Audio/Video should be set
     }

@@ -21,8 +21,8 @@ impl Tim {
             )));
         }
 
-        let pixel_mode = PixelMode::from_u32(header.flags)?;
-        let has_clut = (header.flags & 0x8) != 0;
+        let pixel_mode = header.pixel_mode()?;
+        let has_clut = header.has_clut();
 
         let mut offset = 8;
 
@@ -140,16 +140,16 @@ impl Tim {
         }
 
         // Validate flags field more strictly (from jPSXdec TimValidator line 84)
-        // Only bits 0-3 are used: bits 0-1 for BPP, bit 3 for hasClut
-        if (header.flags & 0xFFF4) != 0 {
+        // Only bits 0-3 are used: bits 0-2 for pixel mode, bit 3 for hasClut
+        if !header.validate_reserved_bits() {
             return Err(PsxError::InvalidFormat(format!(
                 "Invalid TIM flags: 0x{:08X} (reserved bits set)",
                 header.flags
             )));
         }
 
-        let pixel_mode = PixelMode::from_u32(header.flags)?;
-        let has_clut = (header.flags & 0x8) != 0;
+        let pixel_mode = header.pixel_mode()?;
+        let has_clut = header.has_clut();
 
         let mut offset = 8;
         let mut total_size = 8; // Header size

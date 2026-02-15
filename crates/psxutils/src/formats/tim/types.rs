@@ -1,6 +1,7 @@
 //! TIM format type definitions
 
 use crate::{PsxError, Result};
+use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 
 /// TIM magic number (0x10)
@@ -58,6 +59,41 @@ impl PixelMode {
 pub(super) struct TimHeader {
     pub magic: u32,
     pub flags: u32,
+}
+
+bitflags! {
+    /// TIM header flag bits
+    ///
+    /// The TIM flags field (u32) contains:
+    /// - Bits 0-2: Pixel mode (0-4)
+    /// - Bit 3: Has CLUT flag
+    /// - Bits 4-15: Reserved (must be 0)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(super) struct TimHeaderFlags: u32 {
+        /// Has Color Lookup Table (CLUT)
+        const HAS_CLUT = 0x08;
+        /// Mask for pixel mode bits (0-2)
+        const PIXEL_MODE_MASK = 0x07;
+        /// Mask for valid bits (mode + CLUT flag)
+        const VALID_BITS = 0x0F;
+    }
+}
+
+impl TimHeader {
+    /// Extract pixel mode from flags
+    pub(super) fn pixel_mode(&self) -> Result<PixelMode> {
+        PixelMode::from_u32(self.flags & TimHeaderFlags::PIXEL_MODE_MASK.bits())
+    }
+
+    /// Check if TIM has CLUT
+    pub(super) const fn has_clut(&self) -> bool {
+        (self.flags & TimHeaderFlags::HAS_CLUT.bits()) != 0
+    }
+
+    /// Validate reserved bits are not set
+    pub(super) const fn validate_reserved_bits(&self) -> bool {
+        (self.flags & !TimHeaderFlags::VALID_BITS.bits()) == 0
+    }
 }
 
 /// Color Lookup Table (CLUT) header

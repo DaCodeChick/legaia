@@ -306,7 +306,7 @@ impl CdRom {
     /// * `size` - Number of bytes to read
     pub fn read_data(&self, start_lba: u32, size: usize) -> Result<Vec<u8>> {
         // Sanity check: reject absurdly large sizes
-        const MAX_READ_SIZE: usize = 150 * 1024 * 1024; // 150MB max per read
+        const MAX_READ_SIZE: usize = 100 * 1024 * 1024; // 100MB max per read
         if size > MAX_READ_SIZE {
             return Err(PsxError::ParseError(format!(
                 "Read size too large: {} bytes (max {} bytes)",

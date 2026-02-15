@@ -193,9 +193,34 @@ fn scan_prot_dat(
 }
 
 #[cfg(feature = "extraction")]
+fn read_prot_dat_chunked(
+    disc: &CdRom,
+    prot_entry: &psxutils::cdrom::DirectoryEntry,
+) -> Result<Vec<u8>> {
+    const CHUNK_SIZE: usize = 50 * 1024 * 1024; // 50 MB chunks
+    let file_size = prot_entry.size as usize;
+    let file_lba = prot_entry.lba;
+    let mut all_data = Vec::with_capacity(file_size);
+
+    let mut file_offset = 0;
+    while file_offset < file_size {
+        let chunk_size = CHUNK_SIZE.min(file_size - file_offset);
+        let sectors_to_skip = file_offset / 2048;
+        let chunk_lba = file_lba + sectors_to_skip as u32;
+
+        let chunk_data = disc.read_data(chunk_lba, chunk_size)?;
+        all_data.extend_from_slice(&chunk_data);
+
+        file_offset += chunk_size;
+    }
+
+    Ok(all_data)
+}
+
+#[cfg(feature = "extraction")]
 fn extract_all_tims(
     disc: &CdRom,
-    _prot_entry: &psxutils::cdrom::DirectoryEntry,
+    prot_entry: &psxutils::cdrom::DirectoryEntry,
     tim_assets: &[psxutils::DiscoveredAsset],
     full_dir: &Path,
     thumb_dir: &Path,
@@ -212,8 +237,9 @@ fn extract_all_tims(
     let successful_count = Arc::new(AtomicUsize::new(0));
     let failed_count = Arc::new(AtomicUsize::new(0));
 
-    // Read entire PROT.DAT once (it's only 121MB)
-    let prot_data = disc.read_file("PROT.DAT")?;
+    // Read PROT.DAT in chunks to avoid hitting 100MB limit
+    // We'll read it in 50MB chunks and cache the necessary data
+    let prot_data = read_prot_dat_chunked(disc, prot_entry)?;
 
     // Parallel extraction with rayon
     let metadata: Vec<TimMetadata> = tim_assets

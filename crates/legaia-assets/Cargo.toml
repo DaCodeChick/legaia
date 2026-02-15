@@ -14,6 +14,10 @@ path = "src/bin/extract.rs"
 name = "extract"
 path = "examples/extract.rs"
 
+[[example]]
+name = "test_tmd_convert"
+path = "examples/test_tmd_convert.rs"
+
 [dependencies]
 # PSX format parsers
 psxutils = { path = "../psxutils" }
@@ -40,3 +44,6 @@ gltf-json = "1.4"
 clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# For locating asset directories
+dirs = "6.0"

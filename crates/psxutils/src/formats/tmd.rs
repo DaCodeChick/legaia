@@ -216,9 +216,26 @@ impl Tmd {
             });
         }
 
-        // Parse primitives (simplified - just parse basic structure)
-        // Full primitive parsing would require handling all primitive types
-        let primitives = Vec::new(); // TODO: Implement primitive parsing
+        // Parse primitives
+        let mut primitives = Vec::new();
+        let mut prim_pos = _prim_offset;
+
+        for _ in 0.._prim_count {
+            if prim_pos >= file_data.len() {
+                break; // Reached end of data
+            }
+
+            // Parse primitive header
+            if prim_pos + 4 > file_data.len() {
+                break;
+            }
+
+            let prim = Self::parse_primitive(file_data, prim_pos)?;
+            let packet_size = Self::primitive_packet_size(file_data, prim_pos)?;
+
+            primitives.push(prim);
+            prim_pos += packet_size;
+        }
 
         Ok(TmdObject {
             vertices,
@@ -226,6 +243,224 @@ impl Tmd {
             primitives,
             scale,
         })
+    }
+
+    /// Parse a single primitive from data
+    fn parse_primitive(data: &[u8], offset: usize) -> Result<TmdPrimitive> {
+        if offset + 4 > data.len() {
+            return Err(PsxError::ParseError(
+                "Primitive header out of bounds".to_string(),
+            ));
+        }
+
+        // Primitive packet structure:
+        // Byte 0: olen (packet length in 32-bit words)
+        // Byte 1: ilen (packet header length in 32-bit words)
+        // Byte 2: flag (primitive flags)
+        // Byte 3: mode (primitive mode/type)
+
+        let _olen = data[offset] as usize;
+        let _ilen = data[offset + 1] as usize;
+        let flag = data[offset + 2];
+        let mode = data[offset + 3];
+
+        // Determine primitive type from mode/flag
+        let is_quad = (mode & 0x08) != 0;
+        let is_textured = (mode & 0x04) != 0;
+        let is_gouraud = (mode & 0x10) != 0; // Smooth shading (per-vertex normals)
+        let _is_light_calc = (flag & 0x01) == 0; // Light source calculation enabled
+
+        let pos = offset + 4;
+
+        if is_quad {
+            Self::parse_quad(data, pos, is_textured, is_gouraud)
+        } else {
+            Self::parse_triangle(data, pos, is_textured, is_gouraud)
+        }
+    }
+
+    /// Parse a triangle primitive
+    fn parse_triangle(
+        data: &[u8],
+        mut pos: usize,
+        is_textured: bool,
+        is_gouraud: bool,
+    ) -> Result<TmdPrimitive> {
+        // Normal indices (0 or 3 depending on gouraud)
+        let normals = if is_gouraud {
+            if pos + 6 > data.len() {
+                return Err(PsxError::ParseError(
+                    "Triangle normals out of bounds".to_string(),
+                ));
+            }
+            let n0 = u16::from_le_bytes([data[pos], data[pos + 1]]);
+            let n1 = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
+            let n2 = u16::from_le_bytes([data[pos + 4], data[pos + 5]]);
+            pos += 6;
+            Some([n0, n1, n2])
+        } else {
+            if pos + 2 > data.len() {
+                return Err(PsxError::ParseError(
+                    "Triangle normal out of bounds".to_string(),
+                ));
+            }
+            let n = u16::from_le_bytes([data[pos], data[pos + 1]]);
+            pos += 2;
+            Some([n, n, n]) // Use same normal for all vertices
+        };
+
+        // Vertex indices
+        if pos + 6 > data.len() {
+            return Err(PsxError::ParseError(
+                "Triangle vertices out of bounds".to_string(),
+            ));
+        }
+        let v0 = u16::from_le_bytes([data[pos], data[pos + 1]]);
+        let v1 = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
+        let v2 = u16::from_le_bytes([data[pos + 4], data[pos + 5]]);
+        pos += 6;
+
+        // UVs and texture info (if textured)
+        let (uvs, texture_info) = if is_textured {
+            if pos + 12 > data.len() {
+                return Err(PsxError::ParseError(
+                    "Triangle texture data out of bounds".to_string(),
+                ));
+            }
+
+            let u0 = data[pos];
+            let v0_uv = data[pos + 1];
+            let clut_x = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
+            let clut_y = u16::from_le_bytes([data[pos + 4], data[pos + 5]]);
+
+            let u1 = data[pos + 6];
+            let v1_uv = data[pos + 7];
+            let tpage = u16::from_le_bytes([data[pos + 8], data[pos + 9]]);
+
+            let u2 = data[pos + 10];
+            let v2_uv = data[pos + 11];
+
+            (
+                Some([(u0, v0_uv), (u1, v1_uv), (u2, v2_uv)]),
+                Some(TextureInfo {
+                    clut_x,
+                    clut_y,
+                    tpage,
+                }),
+            )
+        } else {
+            (None, None)
+        };
+
+        Ok(TmdPrimitive::Triangle {
+            vertices: [v0, v1, v2],
+            normals,
+            uvs,
+            colors: None, // Colors typically not stored in TMD
+            texture_info,
+        })
+    }
+
+    /// Parse a quad primitive
+    fn parse_quad(
+        data: &[u8],
+        mut pos: usize,
+        is_textured: bool,
+        is_gouraud: bool,
+    ) -> Result<TmdPrimitive> {
+        // Normal indices (0 or 4 depending on gouraud)
+        let normals = if is_gouraud {
+            if pos + 8 > data.len() {
+                return Err(PsxError::ParseError(
+                    "Quad normals out of bounds".to_string(),
+                ));
+            }
+            let n0 = u16::from_le_bytes([data[pos], data[pos + 1]]);
+            let n1 = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
+            let n2 = u16::from_le_bytes([data[pos + 4], data[pos + 5]]);
+            let n3 = u16::from_le_bytes([data[pos + 6], data[pos + 7]]);
+            pos += 8;
+            Some([n0, n1, n2, n3])
+        } else {
+            if pos + 2 > data.len() {
+                return Err(PsxError::ParseError(
+                    "Quad normal out of bounds".to_string(),
+                ));
+            }
+            let n = u16::from_le_bytes([data[pos], data[pos + 1]]);
+            pos += 2;
+            Some([n, n, n, n]) // Use same normal for all vertices
+        };
+
+        // Vertex indices
+        if pos + 8 > data.len() {
+            return Err(PsxError::ParseError(
+                "Quad vertices out of bounds".to_string(),
+            ));
+        }
+        let v0 = u16::from_le_bytes([data[pos], data[pos + 1]]);
+        let v1 = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
+        let v2 = u16::from_le_bytes([data[pos + 4], data[pos + 5]]);
+        let v3 = u16::from_le_bytes([data[pos + 6], data[pos + 7]]);
+        pos += 8;
+
+        // UVs and texture info (if textured)
+        let (uvs, texture_info) = if is_textured {
+            if pos + 16 > data.len() {
+                return Err(PsxError::ParseError(
+                    "Quad texture data out of bounds".to_string(),
+                ));
+            }
+
+            let u0 = data[pos];
+            let v0_uv = data[pos + 1];
+            let clut_x = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
+            let clut_y = u16::from_le_bytes([data[pos + 4], data[pos + 5]]);
+
+            let u1 = data[pos + 6];
+            let v1_uv = data[pos + 7];
+            let tpage = u16::from_le_bytes([data[pos + 8], data[pos + 9]]);
+
+            let u2 = data[pos + 10];
+            let v2_uv = data[pos + 11];
+
+            let u3 = data[pos + 14];
+            let v3_uv = data[pos + 15];
+
+            (
+                Some([(u0, v0_uv), (u1, v1_uv), (u2, v2_uv), (u3, v3_uv)]),
+                Some(TextureInfo {
+                    clut_x,
+                    clut_y,
+                    tpage,
+                }),
+            )
+        } else {
+            (None, None)
+        };
+
+        Ok(TmdPrimitive::Quad {
+            vertices: [v0, v1, v2, v3],
+            normals,
+            uvs,
+            colors: None,
+            texture_info,
+        })
+    }
+
+    /// Calculate the size of a primitive packet in bytes
+    fn primitive_packet_size(data: &[u8], offset: usize) -> Result<usize> {
+        if offset >= data.len() {
+            return Err(PsxError::ParseError(
+                "Primitive offset out of bounds".to_string(),
+            ));
+        }
+
+        // olen is the packet length in 32-bit words (including the header)
+        let olen = data[offset] as usize;
+
+        // Convert from 32-bit words to bytes
+        Ok(olen * 4)
     }
 
     /// Convert to normalized floating point vertices

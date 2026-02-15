@@ -3,20 +3,17 @@
 use anyhow::Result;
 use gltf_json as json;
 use gltf_json::validation::USize64;
-use psxutils::formats::Tmd;
+use psxutils::formats::tmd::{Tmd, TmdPrimitive};
 use std::fs;
 use std::path::Path;
 
 /// Convert a TMD model to glTF 2.0 format
 pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
     let mut root = json::Root::default();
-    let mut buffers = Vec::new();
+    let mut buffer_data = Vec::new();
     let mut buffer_views = Vec::new();
     let mut accessors = Vec::new();
     let mut meshes = Vec::new();
-
-    // For now, export only vertices as a simple point cloud
-    // Full primitive export would require implementing the primitive parser in TMD
 
     for (_obj_idx, object) in tmd.objects.iter().enumerate() {
         // Skip empty objects
@@ -24,16 +21,17 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             continue;
         }
 
-        // Convert vertices to f32 positions
+        // Calculate scale factor
         let scale = if object.scale == 0 {
             1.0
         } else {
             object.scale as f32
         };
 
+        // Convert vertices to f32 positions
         let mut positions: Vec<f32> = Vec::new();
-        let mut min = [f32::MAX, f32::MAX, f32::MAX];
-        let mut max = [f32::MIN, f32::MIN, f32::MIN];
+        let mut pos_min = [f32::MAX, f32::MAX, f32::MAX];
+        let mut pos_max = [f32::MIN, f32::MIN, f32::MIN];
 
         for vertex in &object.vertices {
             let x = vertex.x as f32 / scale;
@@ -44,43 +42,84 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             positions.push(y);
             positions.push(z);
 
-            min[0] = min[0].min(x);
-            min[1] = min[1].min(y);
-            min[2] = min[2].min(z);
+            pos_min[0] = pos_min[0].min(x);
+            pos_min[1] = pos_min[1].min(y);
+            pos_min[2] = pos_min[2].min(z);
 
-            max[0] = max[0].max(x);
-            max[1] = max[1].max(y);
-            max[2] = max[2].max(z);
+            pos_max[0] = pos_max[0].max(x);
+            pos_max[1] = pos_max[1].max(y);
+            pos_max[2] = pos_max[2].max(z);
         }
 
-        // Convert to bytes
+        // Convert normals to f32
+        let mut normals: Vec<f32> = Vec::new();
+        for normal in &object.normals {
+            let nx = normal.nx as f32 / 4096.0;
+            let ny = normal.ny as f32 / 4096.0;
+            let nz = normal.nz as f32 / 4096.0;
+            let len = (nx * nx + ny * ny + nz * nz).sqrt();
+
+            if len > 0.0 {
+                normals.push(nx / len);
+                normals.push(ny / len);
+                normals.push(nz / len);
+            } else {
+                normals.push(0.0);
+                normals.push(1.0);
+                normals.push(0.0);
+            }
+        }
+
+        // Build index buffer from primitives
+        let mut indices: Vec<u16> = Vec::new();
+
+        for primitive in &object.primitives {
+            match primitive {
+                TmdPrimitive::Triangle { vertices, .. } => {
+                    // Add triangle indices
+                    indices.push(vertices[0]);
+                    indices.push(vertices[1]);
+                    indices.push(vertices[2]);
+                }
+                TmdPrimitive::Quad { vertices, .. } => {
+                    // Split quad into two triangles (0-1-2, 0-2-3)
+                    indices.push(vertices[0]);
+                    indices.push(vertices[1]);
+                    indices.push(vertices[2]);
+
+                    indices.push(vertices[0]);
+                    indices.push(vertices[2]);
+                    indices.push(vertices[3]);
+                }
+            }
+        }
+
+        // Skip objects with no primitives
+        if indices.is_empty() {
+            continue;
+        }
+
+        // --- Create position buffer and accessor ---
         let position_bytes: Vec<u8> = positions.iter().flat_map(|f| f.to_le_bytes()).collect();
+        let position_offset = buffer_data.len();
+        buffer_data.extend_from_slice(&position_bytes);
 
-        let buffer_length = position_bytes.len();
-
-        // Create buffer
-        let buffer_index = buffers.len();
-        buffers.push(position_bytes);
-
-        // Create buffer view
-        let buffer_view_index = buffer_views.len();
+        let position_view_idx = buffer_views.len();
         buffer_views.push(json::buffer::View {
-            buffer: json::Index::new(buffer_index as u32),
-            byte_length: USize64::from(buffer_length),
-            byte_offset: None,
-            byte_stride: Some(json::buffer::Stride(12)), // 3 floats * 4 bytes
+            buffer: json::Index::new(0),
+            byte_length: USize64::from(position_bytes.len()),
+            byte_offset: Some(USize64::from(position_offset)),
+            byte_stride: None,
             extensions: None,
             extras: Default::default(),
-            name: Some(format!("positions_view_{}", _obj_idx)),
             target: Some(json::validation::Checked::Valid(
                 json::buffer::Target::ArrayBuffer,
             )),
         });
 
-        // Create accessor
-        let accessor_index = accessors.len();
+        let position_accessor_idx = accessors.len();
         accessors.push(json::Accessor {
-            buffer_view: Some(json::Index::new(buffer_view_index as u32)),
+            buffer_view: Some(json::Index::new(position_view_idx as u32)),
             byte_offset: Some(USize64(0)),
             count: USize64::from(object.vertices.len()),
             component_type: json::validation::Checked::Valid(json::accessor::GenericComponentType(
@@ -89,28 +128,109 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             extensions: None,
             extras: Default::default(),
             type_: json::validation::Checked::Valid(json::accessor::Type::Vec3),
-            min: Some(json::Value::from(vec![min[0], min[1], min[2]])),
-            max: Some(json::Value::from(vec![max[0], max[1], max[2]])),
-            name: Some(format!("positions_accessor_{}", _obj_idx)),
+            min: Some(json::Value::from(vec![pos_min[0], pos_min[1], pos_min[2]])),
+            max: Some(json::Value::from(vec![pos_max[0], pos_max[1], pos_max[2]])),
             normalized: false,
             sparse: None,
         });
 
-        // Create mesh primitive (as POINTS for now, since we haven't parsed indices)
-        let primitive = json::mesh::Primitive {
-            attributes: {
-                let mut map = std::collections::BTreeMap::new();
-                map.insert(
-                    json::validation::Checked::Valid(json::mesh::Semantic::Positions),
-                    json::Index::new(accessor_index as u32),
-                );
-                map
-            },
+        // --- Create normal buffer and accessor (if normals exist) ---
+        let normal_accessor_idx = if !normals.is_empty() {
+            let normal_bytes: Vec<u8> = normals.iter().flat_map(|f| f.to_le_bytes()).collect();
+            let normal_offset = buffer_data.len();
+            buffer_data.extend_from_slice(&normal_bytes);
+
+            let normal_view_idx = buffer_views.len();
+            buffer_views.push(json::buffer::View {
+                buffer: json::Index::new(0),
+                byte_length: USize64::from(normal_bytes.len()),
+                byte_offset: Some(USize64::from(normal_offset)),
+                byte_stride: None,
+                extensions: None,
+                extras: Default::default(),
+                target: Some(json::validation::Checked::Valid(
+                    json::buffer::Target::ArrayBuffer,
+                )),
+            });
+
+            let idx = accessors.len();
+            accessors.push(json::Accessor {
+                buffer_view: Some(json::Index::new(normal_view_idx as u32)),
+                byte_offset: Some(USize64(0)),
+                count: USize64::from(object.normals.len()),
+                component_type: json::validation::Checked::Valid(
+                    json::accessor::GenericComponentType(json::accessor::ComponentType::F32),
+                ),
+                extensions: None,
+                extras: Default::default(),
+                type_: json::validation::Checked::Valid(json::accessor::Type::Vec3),
+                min: None,
+                max: None,
+                normalized: false,
+                sparse: None,
+            });
+
+            Some(idx)
+        } else {
+            None
+        };
+
+        // --- Create index buffer and accessor ---
+        let index_bytes: Vec<u8> = indices.iter().flat_map(|i| i.to_le_bytes()).collect();
+        let index_offset = buffer_data.len();
+        buffer_data.extend_from_slice(&index_bytes);
+
+        let index_view_idx = buffer_views.len();
+        buffer_views.push(json::buffer::View {
+            buffer: json::Index::new(0),
+            byte_length: USize64::from(index_bytes.len()),
+            byte_offset: Some(USize64::from(index_offset)),
+            byte_stride: None,
             extensions: None,
             extras: Default::default(),
-            indices: None, // TODO: Add when primitive parsing is implemented
+            target: Some(json::validation::Checked::Valid(
+                json::buffer::Target::ElementArrayBuffer,
+            )),
+        });
+
+        let index_accessor_idx = accessors.len();
+        accessors.push(json::Accessor {
+            buffer_view: Some(json::Index::new(index_view_idx as u32)),
+            byte_offset: Some(USize64(0)),
+            count: USize64::from(indices.len()),
+            component_type: json::validation::Checked::Valid(json::accessor::GenericComponentType(
+                json::accessor::ComponentType::U16,
+            )),
+            extensions: None,
+            extras: Default::default(),
+            type_: json::validation::Checked::Valid(json::accessor::Type::Scalar),
+            min: None,
+            max: None,
+            normalized: false,
+            sparse: None,
+        });
+
+        // --- Create mesh primitive with triangles ---
+        let mut attributes = std::collections::BTreeMap::new();
+        attributes.insert(
+            json::validation::Checked::Valid(json::mesh::Semantic::Positions),
+            json::Index::new(position_accessor_idx as u32),
+        );
+
+        if let Some(normal_idx) = normal_accessor_idx {
+            attributes.insert(
+                json::validation::Checked::Valid(json::mesh::Semantic::Normals),
+                json::Index::new(normal_idx as u32),
+            );
+        }
+
+        let primitive = json::mesh::Primitive {
+            attributes,
+            extensions: None,
+            extras: Default::default(),
+            indices: Some(json::Index::new(index_accessor_idx as u32)),
             material: None,
-            mode: json::validation::Checked::Valid(json::mesh::Mode::Points),
+            mode: json::validation::Checked::Valid(json::mesh::Mode::Triangles),
             targets: None,
         };
 
@@ -118,10 +238,14 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
         meshes.push(json::Mesh {
             extensions: None,
             extras: Default::default(),
-            name: Some(format!("mesh_{}", _obj_idx)),
             primitives: vec![primitive],
             weights: None,
         });
+    }
+
+    // If no meshes were created, return an error
+    if meshes.is_empty() {
+        return Err(anyhow::anyhow!("No valid meshes found in TMD file"));
     }
 
     // Create nodes for each mesh
@@ -135,7 +259,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
             extras: Default::default(),
             matrix: None,
             mesh: Some(json::Index::new(i as u32)),
-            name: Some(format!("node_{}", i)),
             rotation: None,
             scale: None,
             translation: None,
@@ -148,7 +271,6 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
     let scene = json::Scene {
         extensions: None,
         extras: Default::default(),
-        name: Some("Scene".to_string()),
         nodes: nodes
             .iter()
             .enumerate()
@@ -158,20 +280,15 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
 
     // Build root
     root.accessors = accessors;
-    root.buffers = buffers
-        .iter()
-        .enumerate()
-        .map(|(i, b)| json::Buffer {
-            byte_length: USize64::from(b.len()),
-            extensions: None,
-            extras: Default::default(),
-            name: Some(format!("buffer_{}", i)),
-            uri: Some(format!(
-                "{}.bin",
-                output_path.file_stem().unwrap().to_string_lossy()
-            )),
-        })
-        .collect();
+    root.buffers = vec![json::Buffer {
+        byte_length: USize64::from(buffer_data.len()),
+        extensions: None,
+        extras: Default::default(),
+        uri: Some(format!(
+            "{}.bin",
+            output_path.file_stem().unwrap().to_string_lossy()
+        )),
+    }];
     root.buffer_views = buffer_views;
     root.meshes = meshes;
     root.nodes = nodes;
@@ -184,8 +301,7 @@ pub fn tmd_to_gltf(tmd: &Tmd, output_path: &Path) -> Result<()> {
 
     // Write binary buffer
     let bin_path = output_path.with_extension("bin");
-    let all_buffers = buffers.concat();
-    fs::write(bin_path, all_buffers)?;
+    fs::write(bin_path, buffer_data)?;
 
     Ok(())
 }

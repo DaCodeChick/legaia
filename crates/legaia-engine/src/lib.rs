@@ -16,6 +16,7 @@ pub mod field;
 pub mod graphics;
 pub mod input;
 pub mod menu;
+pub mod setup;
 pub mod state;
 
 pub use core_state::*;
@@ -29,6 +30,8 @@ pub struct LegaiaEnginePlugin;
 impl Plugin for LegaiaEnginePlugin {
     fn build(&self, app: &mut App) {
         app
+            // First-run setup
+            .add_plugins(setup::SetupPlugin)
             // Core state resources
             .add_plugins(CoreStatePlugin)
             // State management
@@ -38,7 +41,7 @@ impl Plugin for LegaiaEnginePlugin {
             .add_systems(Update, state::update_frame_counter)
             .add_systems(Update, state::handle_state_transitions)
             // Add core systems
-            .add_systems(Startup, setup)
+            .add_systems(Startup, setup_engine)
             // Battle system
             .add_plugins(battle::BattlePlugin)
             // Field system
@@ -54,7 +57,7 @@ impl Plugin for LegaiaEnginePlugin {
     }
 }
 
-fn setup(mut commands: Commands) {
+fn setup_engine(mut commands: Commands) {
     // Camera setup (Bevy 0.18+ uses required components instead of bundles)
     commands.spawn((
         Camera3d::default(),

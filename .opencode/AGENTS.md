@@ -427,7 +427,7 @@ Total: ~100 functions | Status: Partially Named
 | ... | ... | ... | ... | ... |
 
 #### Main Game Code (0x80010000-0x8007B7FF)
-Total: 1,121 functions | Status: 14 Complete, 1,107 Remaining
+Total: 1,121 functions | Status: 21 Complete, 1,100 Remaining (1.9% progress)
 
 | Address    | Function Name | Status | System | Notes |
 |------------|---------------|--------|--------|-------|
@@ -445,7 +445,23 @@ Total: 1,121 functions | Status: 14 Complete, 1,107 Remaining
 | 0x8002b934 | vibration_stub | **✅ Complete** | Input | Empty stub for vibration (disabled in this build). |
 | 0x8001d230 | init_memory_card_system | **✅ Complete** | Save | Memory card init for both slots (5 functions + 13 globals renamed). |
 | 0x8002b3d4 | init_memory_allocator | **✅ Complete** | Memory | Custom heap allocator (9 locals + 1 global). Complex. |
+| 0x800265e8 | init_data_tables | **✅ Complete** | Data | Data table initialization (14 globals renamed). Session #3. |
+| 0x8001d424 | init_game_state | **✅ Complete** | Core | Game state init (9 locals, 5 funcs, 52+ globals). Session #3. |
+| 0x8003f08c | init_cdrom_protection | **✅ Complete** | CD-ROM | Copy protection system (1 param, 3 globals, 1 func). Session #3. |
+| 0x8003e4e8 | load_cdrom_file | **✅ Complete** | CD-ROM | CD file loader (8 locals, 4 globals). Session #3. |
+| 0x8002666c | init_sound_playback_system | **✅ Complete** | Audio | Sound playback init (2 locals). Session #3. |
+| 0x8001e3b8 | allocate_graphics_buffers | **✅ Complete** | Graphics | Double-buffered graphics alloc (6 locals, 12 globals, 2 funcs). Session #3. |
+| 0x8003d254 | gte_load_h_register | **✅ Complete** | Graphics | GTE H register loader (wrapper). Session #3. |
 | ... | ... | Unanalyzed | ... | ... |
+
+**Recently Completed (2026-02-14 DICK Session #3):**
+- ✅ init_data_tables() - Data table initialization (14 globals)
+- ✅ init_game_state() - Comprehensive game state init (52+ globals for GPU, camera, sprites, input)
+- ✅ init_cdrom_protection() - Copy protection loader
+- ✅ load_cdrom_file() - CD-ROM file search and read system
+- ✅ init_sound_playback_system() - Sound playback system init
+- ✅ allocate_graphics_buffers() - Double-buffered graphics memory allocator
+- ✅ gte_load_h_register() - GTE H register wrapper
 
 **Recently Completed (2026-02-14 DICK Session #2):**
 - ✅ init_cdrom_system() - CD-ROM hardware initialization
@@ -456,10 +472,48 @@ Total: 1,121 functions | Status: 14 Complete, 1,107 Remaining
 - ✅ init_memory_card_system() - Memory card system (renamed 5 called functions + 13 globals)
 - ✅ init_memory_allocator() - Custom heap allocator with free list
 
+**Functions Renamed (2026-02-14 Session #3):**
+- load_cdrom_file (was FUN_8003e4e8)
+- allocate_memory_buffer (was FUN_80017888)
+- setup_scratch_buffers (was FUN_8001f690)
+- setup_game_config, init_system_timing, init_game_subsystems, setup_asset_pointers, init_rendering_tables
+
 **Functions Renamed (2026-02-14 Session #2):**
 - init_memory_card_slot_0, init_memory_card_slot_1
 - setup_memory_card_buffers, configure_memory_card_slot
 - finalize_memory_card_setup
+
+**Globals Renamed (2026-02-14 Session #3 - 77+ globals):**
+GPU/Graphics Registers (18):
+- g_gpu_color_mask, g_gpu_primitive_color, g_gpu_register_1/2/3
+- g_gpu_x_offset, g_gpu_y_offset, g_gpu_scratch_config
+
+Camera System (11):
+- g_camera_param_1/2/3/4/5, g_camera_x/y/z_offset
+- g_camera_distance, g_camera_zoom_level
+
+Sprite System (20):
+- g_sprite_table_entry_0 through _14 (10 entries)
+- g_sprite_data_buffer_0 through _5 (6 buffers)
+- g_hardware_register_table
+
+Graphics Buffers (12):
+- g_graphics_buffer_1/2, g_graphics_buffer_1/2_copy
+- g_default_buffer_address, g_buffer_allocated_size, g_requested_buffer_size
+- g_graphics_buffer_index, g_allocation_error_counter, g_special_state_buffer
+- g_expansion_ram_enabled
+
+Display/Rendering (5):
+- g_screen_brightness, g_fade_speed, g_fade_speed_backup
+- g_default_color_value, g_unknown_render_param
+
+CD-ROM Protection (7):
+- g_cdrom_protection_state, g_cdrom_protection_flag_1/2
+- g_cdrom_base_path, g_cdrom_file_sector, g_cdrom_file_frame, g_cdrom_read_counter
+
+Input/State (4):
+- g_controller_state, g_input_state, g_initial_state_id
+- g_unknown_flag_1/2/3/4/5/6
 
 **Globals Renamed (2026-02-14 Session #1):**
 - g_monster_count, g_monster_audio_base_sector, g_monster_audio_offset_table

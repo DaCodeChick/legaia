@@ -427,7 +427,7 @@ Total: ~100 functions | Status: Partially Named
 | ... | ... | ... | ... | ... |
 
 #### Main Game Code (0x80010000-0x8007B7FF)
-Total: 1,121 functions | Status: 5 Complete, 1,116 Remaining
+Total: 1,121 functions | Status: 14 Complete, 1,107 Remaining
 
 | Address    | Function Name | Status | System | Notes |
 |------------|---------------|--------|--------|-------|
@@ -438,22 +438,39 @@ Total: 1,121 functions | Status: 5 Complete, 1,116 Remaining
 | 0x8003ee7c | init_serial_audio | **✅ Complete** | Audio | Initializes CD audio. All params/locals renamed. Commented. |
 | 0x8003e104 | load_monster_audio_data | **✅ Complete** | Audio | Loads monster audio from CD or host. ALL symbols renamed. Fully documented. |
 | 0x80060910 | PCclose | **✅ Complete** | Library | PSX library function to close file opened with PCopen |
+| 0x8003f024 | init_cdrom_system | **✅ Complete** | CD-ROM | Initializes CD-ROM drive. 3 globals renamed. Fully documented. |
+| 0x80062310 | init_sound_system | **✅ Complete** | Audio | High-level sound system init. Calls init_spu. |
+| 0x800693b8 | init_spu | **✅ Complete** | Audio | SPU hardware initialization wrapper. |
+| 0x800644c0 | init_sprite_buffer | **✅ Complete** | Graphics | 2D sprite buffer grid (9 locals + 3 globals). Fully documented. |
+| 0x8002b934 | vibration_stub | **✅ Complete** | Input | Empty stub for vibration (disabled in this build). |
+| 0x8001d230 | init_memory_card_system | **✅ Complete** | Save | Memory card init for both slots (5 functions + 13 globals renamed). |
+| 0x8002b3d4 | init_memory_allocator | **✅ Complete** | Memory | Custom heap allocator (9 locals + 1 global). Complex. |
 | ... | ... | Unanalyzed | ... | ... |
 
-**Recently Completed (2026-02-14 DICK Session):**
-- ✅ main() - Verified all symbols renamed
-- ✅ get_config_mode() - Simple constant return
-- ✅ get_system_mode() - Simple constant return  
-- ✅ init_serial_audio() - CD audio initialization
-- ✅ load_monster_audio_data() - Complex function, 10 locals + 5 globals + 1 called function renamed
-- ✅ PCclose() - PSX library function identified
+**Recently Completed (2026-02-14 DICK Session #2):**
+- ✅ init_cdrom_system() - CD-ROM hardware initialization
+- ✅ init_sound_system() - Sound system wrapper
+- ✅ init_spu() - SPU hardware init
+- ✅ init_sprite_buffer() - Complex 2D sprite grid allocator
+- ✅ vibration_stub() - Disabled vibration stub
+- ✅ init_memory_card_system() - Memory card system (renamed 5 called functions + 13 globals)
+- ✅ init_memory_allocator() - Custom heap allocator with free list
 
-**Globals Renamed (2026-02-14):**
-- g_monster_count (0x801c8984)
-- g_monster_audio_base_sector (0x801c7eec)
-- g_monster_audio_offset_table (0x801c8980)
-- g_cdrom_error_counter (0x8007b86e)
-- g_loaded_audio_size (0x8007bc38)
+**Functions Renamed (2026-02-14 Session #2):**
+- init_memory_card_slot_0, init_memory_card_slot_1
+- setup_memory_card_buffers, configure_memory_card_slot
+- finalize_memory_card_setup
+
+**Globals Renamed (2026-02-14 Session #1):**
+- g_monster_count, g_monster_audio_base_sector, g_monster_audio_offset_table
+- g_cdrom_error_counter, g_loaded_audio_size
+
+**Globals Renamed (2026-02-14 Session #2):**
+- g_cdrom_mode_param, g_cdrom_counter_1, g_cdrom_counter_2
+- g_sprite_buffer_row_count, g_sprite_buffer_sprites_per_row, g_sprite_buffer_row_pointers
+- g_memory_card_buffer_1/2/3, g_memory_card_slot_0/1_data
+- g_memory_card_event_1 through _8 (8 event handles)
+- g_memory_allocator_base
 
 #### Current Work Queue (DICK Methodology)
 

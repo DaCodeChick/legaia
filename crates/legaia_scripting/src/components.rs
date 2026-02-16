@@ -1,26 +1,23 @@
 //! Entity Components for Combat System
-//!
-//! Based on PSX entity structure (24+ offsets documented in entity-structure.md)
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Core combat entity component
-/// Maps to PSX entity_t structure
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct CombatEntity {
-    /// Entity flags (PSX offset +0x10)
+    /// Entity flags
     pub flags: u32,
 
-    /// Animation flags (PSX offset +0x62)
+    /// Animation flags
     pub anim_flags: u16,
 
-    /// Ordering table depth for rendering (PSX offset +0x9e)
+    /// Ordering table depth for rendering
     pub render_priority: i16,
 }
 
 /// RGB color interpolation component
-/// Handles smooth color transitions (PSX offsets +0x7c to +0x90)
+/// Handles smooth color transitions
 #[derive(Component, Debug, Clone)]
 pub struct ColorInterpolation {
     /// Current RGB values (0.0-1.0 range)
@@ -34,7 +31,6 @@ pub struct ColorInterpolation {
 }
 
 /// Animation timer component
-/// Maps to PSX timers at offsets +0x98, +0x9a, +0x9c
 #[derive(Component, Debug, Clone)]
 pub struct AnimationTimers {
     /// General animation timer
@@ -48,7 +44,6 @@ pub struct AnimationTimers {
 }
 
 /// Script callback component
-/// Replaces PSX function pointer at offset +0xc
 #[derive(Component, Debug, Clone)]
 pub struct ScriptCallback {
     /// Script file path (e.g., "scripts/combat/enemy_slime.rhai")

@@ -70,8 +70,14 @@ fn main() -> Result<()> {
 
 #[cfg(feature = "extraction")]
 fn run_extraction() -> Result<()> {
-    let disc_path = "/home/admin/Downloads/Legend of Legaia.bin";
-    let output_dir = Path::new("/tmp/extracted_tims");
+    let disc_path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "/home/admin/Downloads/Legend of Legaia.bin".to_string());
+
+    let output_dir_str = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "/tmp/extracted_tims".to_string());
+    let output_dir = Path::new(&output_dir_str);
 
     println!("=== TIM Texture Extractor ===");
     println!("Disc: {}", disc_path);

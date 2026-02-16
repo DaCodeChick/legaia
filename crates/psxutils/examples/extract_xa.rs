@@ -17,14 +17,19 @@ struct XaStream {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let disc_path = "/home/admin/Downloads/Legend of Legaia.bin";
-    let output_dir = "/tmp/extracted_xa";
+    let disc_path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "/home/admin/Downloads/Legend of Legaia.bin".to_string());
+
+    let output_dir = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "/tmp/extracted_xa".to_string());
 
     println!("Opening disc: {}", disc_path);
-    let cdrom = CdRom::open(disc_path)?;
+    let cdrom = CdRom::open(&disc_path)?;
 
     // Create output directory
-    std::fs::create_dir_all(output_dir)?;
+    std::fs::create_dir_all(&output_dir)?;
     println!("Output directory: {}", output_dir);
 
     // Get list of XA files
@@ -63,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             duration_secs
         );
 
-        match extract_stream(&cdrom, stream, output_dir) {
+        match extract_stream(&cdrom, stream, &output_dir) {
             Ok(path) => println!("✓ {}", path.file_name().unwrap().to_string_lossy()),
             Err(e) => println!("✗ Error: {}", e),
         }

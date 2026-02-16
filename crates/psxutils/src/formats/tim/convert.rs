@@ -5,13 +5,42 @@ use crate::{PsxError, Result};
 
 /// Convert RGB555 color to RGBA8 format
 ///
-/// PSX RGB555 format: 0BBBBBGGGGGRRRRR (15-bit color + 1 transparency bit)
+/// PSX RGB555 format: 0BBBBBGGGGGRRRRR (15-bit color + 1 STP bit)
+///
+/// Alpha handling follows jPSXdec reference implementation:
+/// - Black (RGB=0,0,0) with STP=0: Fully transparent (alpha=0) - transparency key
+/// - Black (RGB=0,0,0) with STP=1: Fully opaque (alpha=255) - solid black
+/// - Color with STP=0: Fully opaque (alpha=255) - normal rendering
+/// - Color with STP=1: Semi-transparent (alpha=254) - blending enabled
+///
+/// Reference: jPSXdec/src/jpsxdec/psxvideo/PsxRgb.java::psxABGR1555toARGB8888
 #[inline]
 fn rgb555_to_rgba(color: u16) -> [u8; 4] {
     let r = ((color & 0x1F) << 3) as u8;
     let g = (((color >> 5) & 0x1F) << 3) as u8;
     let b = (((color >> 10) & 0x1F) << 3) as u8;
-    let a = if color & 0x8000 == 0 { 0 } else { 255 }; // Bit 15 = transparency
+
+    // Alpha handling based on jPSXdec logic
+    let a = if r == 0 && g == 0 && b == 0 {
+        // Black pixels: bit 15 determines transparency
+        // STP=0 (bit clear) → transparent (used as transparency key)
+        // STP=1 (bit set) → opaque black
+        if color & 0x8000 == 0 {
+            0
+        } else {
+            255
+        }
+    } else {
+        // Non-black pixels: bit 15 determines blending mode
+        // STP=0 (bit clear) → fully opaque (normal rendering)
+        // STP=1 (bit set) → semi-transparent (PSX blending)
+        if color & 0x8000 == 0 {
+            255
+        } else {
+            254
+        }
+    };
+
     [r, g, b, a]
 }
 

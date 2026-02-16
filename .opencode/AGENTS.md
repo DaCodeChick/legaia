@@ -1714,42 +1714,70 @@ ItemData* get_item_data(int item_id) {
 
 ### Legend of Legaia Specific Formats
 
-#### PROT.DAT Archive Structure (619 files, ~116 MB)
-Complete analysis of file types:
-- **Custom 3D Models**: 92 files (~7.5 MB) - signature `0x80000002` at offset +4
-- **Embedded TIM Textures**: 44 container files with 916 total TIM images (~15 MB extracted)
-- **Embedded VAG Audio**: 1 file (file_0612.bin, 28 KB)
-- **Dummy Files**: 138 files (282 KB) - "pochipochipochi..." placeholder pattern
-- **Zero-filled Files**: 6 files (227 KB) - padding/alignment
-- **Unknown Format**: 383 files (~42 MB) - need further analysis
+#### PROT.DAT Structure (~116 MB)
 
-#### TIM Texture Extraction (Discovered 2026-02-15)
-**✅ SUCCESSFULLY EXTRACTED AND CONVERTED**
+**IMPORTANT**: PROT.DAT is **NOT an indexed archive** with a file table. It contains mixed binary data that must be scanned sequentially for known format signatures.
 
-Legend of Legaia stores TIM textures **embedded in container files** at various offsets, not as standalone files.
+**Scanning Approach** (following jPSXdec methodology):
+- jPSXdec scans the entire disc **sector-by-sector** looking for magic numbers
+- No archive header or offset table is parsed
+- Assets are identified by content signatures (magic bytes), not by index
+- Our implementation uses chunked sequential scanning (5 MB chunks)
+
+**Known Asset Types Found**:
+- **TIM Textures**: 1,130 images (verified extraction with corrected alpha handling)
+  - Magic: `0x00000010`
+  - Sizes range from 136 bytes (4x4 palette) to 33 KB (256x256 backgrounds)
+  - Primarily 4-bit indexed color with 16-color palettes
+- **Custom 3D Models**: Unknown count - signature `0x80000002` at offset +4
+  - NOT standard PSX TMD format (magic `0x00000041` not found)
+  - Custom format specific to Legend of Legaia
+  - Pattern: `[size?] [02000080] [00000000] [02000000] [data...]`
+- **VAG Audio**: Unknown count - magic `"VAGp"` / `0x70474156`
+  - Individual audio sample format
+  - Not scanned by jPSXdec (manual analysis needed)
+- **MIPS Overlays**: Possible executable code modules
+  - Should validate as MIPS machine code
+  - Used for game logic overlays
+- **Unknown/Raw Data**: Everything else extracted as `.bin`
+
+**Previous "619 files" Reference**: This count was from earlier manual analysis, but no file table structure has been verified. Sequential scanning is the correct approach.
+
+#### TIM Texture Extraction (Updated 2026-02-16)
+**✅ SUCCESSFULLY EXTRACTED WITH CORRECTED ALPHA**
+
+Legend of Legaia stores 1,130 TIM textures embedded throughout PROT.DAT at various offsets.
 
 **Extraction Results:**
-- **916 TIM textures** found across 44 container files
-- Largest source: file_0000.bin contains 257 embedded TIM images
-- Total extracted size: ~15 MB
-- Successfully converted sample to PNG (320x256, 8-bit indexed color)
-- TIM parser (`psxutils/src/formats/tim.rs`) verified working correctly
+- **1,130 TIM textures** extracted via sequential scanning
+- Total extracted size: ~12 MB (raw TIM data)
+- PNG output: ~33 MB (full resolution), ~33 MB (thumbnails)
+- 100% success rate - all TIMs converted to PNG
 
-**Example Embedded Locations:**
-- file_0000.bin: 257 TIMs starting at offset 0x1858
-- file_0447.bin: TIM at offset 0x0004 (82,464 bytes)
-- file_0001.bin: 2 TIMs at offsets 0x0058, 0x00e0
+**CRITICAL FIX (2026-02-16):** RGB555 Alpha Handling
+- **Bug**: Previous extraction inverted alpha logic, making opaque colors transparent
+- **Root cause**: Misunderstood PSX STP (semi-transparent) bit behavior
+- **Fix**: Implemented correct alpha logic from jPSXdec reference:
+  - Black (RGB=0,0,0) + STP=0 → Transparent (alpha=0) - transparency key
+  - Black (RGB=0,0,0) + STP=1 → Opaque black (alpha=255)
+  - Color + STP=0 → Fully opaque (alpha=255) - normal rendering
+  - Color + STP=1 → Semi-transparent (alpha=254) - PSX blending
+- **Reference**: jPSXdec `PsxRgb.java::psxABGR1555toARGB8888()`
+- **Impact**: Many previously "blank" TIMs now render correctly with visible graphics
 
 **Texture Characteristics:**
-- Most common: 2,144 byte textures (likely 64x32 or similar small sprites)
-- Larger textures: 32-33 KB (likely 256x128 or 320x256 backgrounds)
-- Color modes: Primarily 8-bit indexed (Clut8Bit) with 256-color palettes
-- Some 4-bit indexed (Clut4Bit) for smaller sprites
+- Smallest: 136 bytes (4x4 pixels) - palette swatches, not corruption
+- Largest: ~33 KB (256x256 backgrounds)
+- Color modes: Primarily 4-bit indexed (Clut4Bit) with 16-color palettes
+- Some 8-bit indexed (Clut8Bit) with 256-color palettes
 
 **Tools Created:**
-- `/tmp/extract_all_tims.py` - Batch extractor scanning all files for embedded TIMs
-- `crates/psxutils/examples/test_tim_convert.rs` - TIM to PNG converter
-- Output directory: `~/.local/share/legaia/assets/textures/`
+- `crates/psxutils/examples/extract_tims.rs` - Production-ready extractor
+  - Multi-threaded with rayon
+  - Progress bars with indicatif
+  - Automatic thumbnail generation
+  - JSON metadata export
+- Output directory: `~/Documents/legaia_extracted/tims_fixed/`
 
 #### Custom 3D Model Format (Discovered 2026-02-15)
 Legend of Legaia uses a **custom 3D model format**, NOT standard PSX TMD files.
@@ -1982,9 +2010,9 @@ Okay, maybe it's just "Decompile It Correctly, Knucklehead" without a clever acr
 
 ### jPSXdec Source
 - **Repository**: https://github.com/m35/jpsxdec
-- **Local copy**: `/tmp/jpsxdec/`
-- **Extracted tool**: `/tmp/jpsxdec_v2.0/jpsxdec.jar`
-- **Index file**: `/tmp/jpsxdec_v2.0/all` (shows what jPSXdec found on disc)
+- **Local copy**: `~/Downloads/jpsxdec/` (DO NOT use /tmp - gets wiped)
+- **Extracted tool**: Tool can be built from source if needed
+- **Index file**: Can be generated via `jpsxdec -f disc.bin -x index.idx`
 
 ### Key Implementation Files
 
